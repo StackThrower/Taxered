@@ -1,3 +1,247 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Green colour scheme carried over from the Next.js version. A few tokens were
+ * adjusted so every text/background pair meets WCAG AA (4.5:1):
+ *  - light --accent 0.55 → 0.50 lightness
+ *  - light --destructive darkened to red-700; dark --primary 0.55 → 0.65,
+ *    --muted-foreground 0.65 → 0.72, --destructive lightened
+ * --control-border is new: form-control outlines need 3:1 against the card (WCAG 1.4.11).
+ */
+:root {
+  --background: oklch(0.98 0.01 142);
+  --foreground: oklch(0.15 0.05 142);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.05 142);
+  --primary: oklch(0.45 0.15 142);
+  --primary-foreground: oklch(0.98 0.01 142);
+  --secondary: oklch(0.25 0.08 142);
+  --secondary-foreground: oklch(0.98 0.01 142);
+  --muted: oklch(0.92 0.02 142);
+  --muted-foreground: oklch(0.45 0.05 142);
+  --accent: oklch(0.5 0.16 142);
+  --accent-foreground: oklch(0.98 0.01 142);
+  --destructive: oklch(0.505 0.213 27.518);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.02 142);
+  --control-border: oklch(0.6 0.03 142);
+  --ring: oklch(0.45 0.15 142);
+  --radius: 0.625rem;
+  color-scheme: light;
+}
+
+.dark {
+  --background: oklch(0.15 0.05 142);
+  --foreground: oklch(0.95 0.02 142);
+  --card: oklch(0.2 0.06 142);
+  --card-foreground: oklch(0.95 0.02 142);
+  --primary: oklch(0.65 0.17 142);
+  --primary-foreground: oklch(0.15 0.05 142);
+  --secondary: oklch(0.65 0.12 142);
+  --secondary-foreground: oklch(0.15 0.05 142);
+  --muted: oklch(0.3 0.08 142);
+  --muted-foreground: oklch(0.72 0.1 142);
+  --accent: oklch(0.6 0.16 142);
+  --accent-foreground: oklch(0.15 0.05 142);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.15 0.05 142);
+  --border: oklch(0.3 0.08 142);
+  --control-border: oklch(0.55 0.05 142);
+  --ring: oklch(0.65 0.17 142);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, sans-serif;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-control-border: var(--control-border);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  a,
+  [role='button'] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+}
+
+/* Small shared building blocks (the Angular counterpart of the shadcn/ui primitives). */
+@layer components {
+  .btn {
+    @apply inline-flex shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none select-none;
+    @apply h-9 px-4 py-2;
+    @apply focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-sm {
+    @apply h-8 gap-1.5 px-3;
+  }
+  .btn-lg {
+    @apply h-10 px-6;
+  }
+  .btn-icon {
+    @apply size-9 px-0;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow-xs hover:bg-primary/90;
+  }
+  .btn-accent {
+    @apply bg-accent text-accent-foreground shadow-xs hover:shadow-md;
+  }
+  .btn-secondary {
+    @apply bg-muted text-foreground shadow-xs hover:bg-muted/80;
+  }
+  .btn-outline {
+    @apply border border-control-border bg-card text-foreground shadow-xs hover:bg-muted;
+  }
+  .btn-ghost {
+    @apply hover:bg-muted hover:text-foreground;
+  }
+  .btn-destructive {
+    @apply bg-destructive text-destructive-foreground shadow-xs hover:bg-destructive/90;
+  }
+
+  .card {
+    @apply flex flex-col gap-6 rounded-xl border bg-card py-6 text-card-foreground shadow-sm;
+  }
+  .card-header {
+    @apply grid auto-rows-min items-start gap-1.5 px-6;
+  }
+  .card-title {
+    @apply leading-tight font-semibold;
+  }
+  .card-description {
+    @apply text-sm text-muted-foreground;
+  }
+  .card-content {
+    @apply px-6;
+  }
+
+  .label {
+    @apply flex items-center gap-2 text-sm leading-none font-medium select-none;
+  }
+  .input {
+    @apply h-9 w-full min-w-0 rounded-md border border-control-border bg-card px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm;
+    @apply placeholder:text-muted-foreground;
+    @apply focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    @apply aria-invalid:border-destructive aria-invalid:ring-destructive/20;
+  }
+  textarea.input {
+    @apply h-auto min-h-16 py-2;
+  }
+  .field-error {
+    @apply text-sm text-destructive;
+  }
+
+  .badge {
+    @apply inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-md border border-transparent bg-muted px-2 py-0.5 text-xs font-medium whitespace-nowrap text-foreground;
+  }
+
+  .alert {
+    @apply relative grid w-full grid-cols-[1rem_1fr] items-start gap-x-3 rounded-lg border bg-card px-4 py-3 text-sm text-card-foreground;
+  }
+}
+
+/* Markdown articles from the knowledge base. */
+.article-content {
+  h2 {
+    @apply mt-8 mb-4 text-3xl font-bold;
+  }
+  h3 {
+    @apply mt-6 mb-3 text-2xl font-bold;
+  }
+  h4,
+  h5,
+  h6 {
+    @apply mt-4 mb-2 text-xl font-bold;
+  }
+  p {
+    @apply mb-4 leading-7;
+  }
+  ul {
+    @apply mb-4 list-disc space-y-2 pl-6;
+  }
+  ol {
+    @apply mb-4 list-decimal space-y-2 pl-6;
+  }
+  li {
+    @apply leading-7;
+  }
+  a {
+    @apply text-primary underline underline-offset-4 hover:decoration-2;
+  }
+  blockquote {
+    @apply my-4 border-l-4 border-primary pl-4 italic;
+  }
+  code {
+    @apply rounded bg-muted px-1.5 py-0.5 text-sm;
+  }
+  pre {
+    @apply mb-4 overflow-x-auto rounded-lg bg-muted p-4 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none;
+  }
+  pre code {
+    @apply bg-transparent p-0;
+  }
+  .table-scroll {
+    @apply my-6 overflow-x-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none;
+  }
+  table {
+    @apply w-full border-collapse border border-border;
+  }
+  thead {
+    @apply bg-muted;
+  }
+  tr {
+    @apply border-b border-border;
+  }
+  th {
+    @apply border border-border bg-muted px-4 py-3 text-left font-semibold;
+  }
+  td {
+    @apply border border-border px-4 py-3 text-left;
+  }
+}

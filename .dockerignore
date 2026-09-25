@@ -1,0 +1,35 @@
+# Dependencies and build output (rebuilt inside the image)
+node_modules
+dist
+.angular
+out-tsc
+coverage
+npm-debug.log*
+
+# Misc
+.DS_Store
+*.pem
+
+# Environment files
+.env*.local
+.env
+
+# Git
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Terraform
+terraform
+*.tfstate
+*.tfvars
+
+# IDE
+.vscode
+.idea
+.claude
+
+# Documentation (articles in src/content are bundled into the app and must stay)
+README.md

@@ -1,0 +1,73 @@
+<footer class="border-t border-border bg-secondary px-4 py-8 text-secondary-foreground md:py-12">
+  <div class="mx-auto max-w-6xl">
+    <div class="mb-6 grid grid-cols-1 gap-6 md:mb-8 md:grid-cols-4 md:gap-8">
+      <nav [attr.aria-label]="s.about">
+        <h2 class="mb-3 text-sm font-semibold md:mb-4 md:text-base">{{ s.about }}</h2>
+        <ul class="space-y-2 text-xs opacity-90 md:text-sm">
+          <li>
+            <a routerLink="/" class="hover:underline">{{ s.home }}</a>
+          </li>
+          <li>
+            <a [routerLink]="paths.about" class="hover:underline">{{ s.about }}</a>
+          </li>
+          <li>
+            <a [routerLink]="paths.privacy" class="hover:underline">{{ s.privacy }}</a>
+          </li>
+          <li>
+            <a [routerLink]="paths.terms" class="hover:underline">{{ s.terms }}</a>
+          </li>
+        </ul>
+      </nav>
+      <nav class="md:col-span-2" [attr.aria-label]="s.documents">
+        <h2 class="mb-3 text-sm font-semibold md:mb-4 md:text-base">{{ s.documents }}</h2>
+        <ul class="space-y-2 text-xs opacity-90 md:text-sm">
+          @for (form of forms; track form.id) {
+            <li>
+              <a [routerLink]="paths.home" fragment="forms" class="hover:underline">{{
+                form.title
+              }}</a>
+            </li>
+          }
+        </ul>
+      </nav>
+      <nav [attr.aria-label]="s.help">
+        <h2 class="mb-3 text-sm font-semibold md:mb-4 md:text-base">{{ s.help }}</h2>
+        <ul class="space-y-2 text-xs opacity-90 md:text-sm">
+          <li>
+            <a [routerLink]="paths.help" class="hover:underline">{{ helpTitle }}</a>
+          </li>
+          <li>
+            <a [routerLink]="paths.calculator" class="hover:underline">{{ calculatorTitle }}</a>
+          </li>
+          <li>
+            <a [routerLink]="paths.knowledge" class="hover:underline">{{ knowledgeTitle }}</a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+
+    <div
+      class="border-t border-secondary-foreground/20 pt-6 text-center text-xs opacity-90 md:pt-8 md:text-sm"
+    >
+      <p>{{ s.copyright }}</p>
+    </div>
+
+    <div class="mt-6 border-t border-secondary-foreground/20 pt-4">
+      <div class="space-y-2 text-justify text-[11px] leading-relaxed opacity-90">
+        <p class="mb-2 text-center font-semibold">
+          ЮРИДИЧНИЙ ДИСКЛЕЙМЕР ТА ОБМЕЖЕННЯ ВІДПОВІДАЛЬНОСТІ
+        </p>
+        @for (item of disclaimer; track item[0]) {
+          <p>
+            <strong>{{ item[0] }}</strong> {{ item[1] }}
+          </p>
+        }
+        <p class="mt-3 text-center font-semibold">
+          ВИКОРИСТОВУЮЧИ ЦЕЙ СЕРВІС, ВИ ПІДТВЕРДЖУЄТЕ, ЩО ПОВНІСТЮ ПРОЧИТАЛИ, ЗРОЗУМІЛИ ТА
+          ПОГОДИЛИСЯ З УСІМА УМОВАМИ ДАНОГО ДИСКЛЕЙМЕРУ. ЯКЩО ВИ НЕ ЗГОДНІ З БУДЬ-ЯКОЮ ЧАСТИНОЮ,
+          НЕГАЙНО ПРИПИНІТЬ ВИКОРИСТАННЯ СЕРВІСУ.
+        </p>
+      </div>
+    </div>
+  </div>
+</footer>

@@ -1,59 +1,61 @@
 # Taxered
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.24.
+Безкоштовний онлайн-сервіс для заповнення податкової декларації **F0121214 (Додаток Ф1)** —
+розрахунок ПДФО та військового збору від операцій з інвестиційними активами. Усі розрахунки
+виконуються в браузері, дані не передаються на сервер.
 
-## Development server
+Порт проєкту [TaxDeclaration](https://github.com/StackThrower/TaxDeclaration) з Next.js на Angular.
 
-To start a local development server, run:
+## Можливості
 
-```bash
-ng serve
-```
+- Форма F0121214: позиції (акції, облігації, опціони, дивіденди, крипто, нерухомість), курси НБУ на дату операції,
+  розрахунок ПДФО 18% / 9% (дивіденди) + військовий збір 1.5% (≤2024) / 5% (≥2025)
+- Імпорт XML-звітів Interactive Brokers (Flex Query) та Freedom Finance
+- Експорт у PDF (з копією) та Excel для перевірки розрахунків
+- Податковий калькулятор для 10 країн, база знань (Markdown-статті), довідка
+- SSR + пререндер усіх сторінок, SEO-метадані та schema.org, `sitemap.xml`
+- PWA (Angular service worker), світла/темна тема, cookie-банер (аналітика лише після згоди)
+- Доступність: WCAG AA, перевірено axe-core на всіх сторінках у світлій і темній темі
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Стек
 
-## Code scaffolding
+Angular 21 (standalone-компоненти, signals, zoneless, SSR/prerender), Tailwind CSS 4, Express,
+jsPDF + jspdf-autotable, SheetJS (xlsx), marked, Lucide.
 
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+## Команди
 
 ```bash
-ng build
+npm install
+npm start                 # dev-сервер: http://localhost:4200
+npm run build             # production-збірка в dist/Taxered (з пререндером)
+npm run serve:ssr:Taxered # запуск зібраного SSR-сервера (PORT, за замовчуванням 4000)
+npm test                  # unit-тести (Vitest)
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+## Структура
 
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
+```
+src/
+  app/
+    core/          # сервіси: SEO, тема, cookie-згода, аналітика; рядки UI (i18n.ts); константи сайту
+    layout/        # шапка, футер, перемикач теми, cookie-банер
+    declaration/   # секція форм і форма F0121214 (tax-model.ts — чиста логіка розрахунку)
+    pages/         # сторінки: головна, калькулятор, про проєкт, довідка, юридичні, база знань, 404
+    lib/           # незалежні від фреймворку модулі: парсер XML брокерів, PDF, Excel, курси НБУ
+    shared/        # компонент іконок
+  content/articles # статті бази знань (Markdown з front matter, вбудовуються під час збірки)
+  server.ts        # Express: заголовки безпеки (CSP тощо), редиректи, sitemap.xml, кешування
+public/            # шрифти DejaVu для PDF, іконки, manifest, robots.txt
 ```
 
-## Running end-to-end tests
+Щоб додати статтю: покладіть `uk-ua-<slug>.md` у `src/content/articles` і зареєструйте її в
+`src/app/pages/knowledge/articles.ts`.
 
-For end-to-end (e2e) testing, run:
+## Деплой
 
-```bash
-ng e2e
-```
+`Dockerfile` збирає застосунок і запускає самодостатній SSR-бандл (`node dist/Taxered/server/server.mjs`,
+порт 3000). GitHub Actions (`.github/workflows/deploy.yml`) публікує образ у GHCR при пуші в `master`;
+`terraform/` описує сервіс Cloud Run.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Дозволені хости для SSR задаються в `angular.json` → `security.allowedHosts`
+(`taxered.stackthrow.com`, `*.run.app`, `localhost`).

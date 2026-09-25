@@ -1,13 +1,90 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Taxered</title>
-  <base href="/">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/x-icon" href="favicon.ico">
-</head>
-<body>
-  <app-root></app-root>
-</body>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8" />
+    <title>Taxered - F0100214 &amp; F0121214</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#000000" />
+    <meta name="application-name" content="Taxered" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Taxered" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no, email=no, address=no" />
+    <meta name="referrer" content="origin-when-cross-origin" />
+    <meta name="author" content="Taxered" />
+    <meta property="og:site_name" content="Taxered Tax Declaration" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:creator" content="@monegoo" />
+
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512x512.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-icon.png" />
+
+    <!-- Apply the saved (or system) theme before first paint to avoid a flash. -->
+    <script>
+      try {
+        var saved = localStorage.getItem('theme');
+        var dark =
+          saved === 'dark' ||
+          ((!saved || saved === 'system') &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (e) {}
+    </script>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        "name": "Taxered",
+        "url": "https://taxered.stackthrow.com",
+        "logo": "https://taxered.stackthrow.com/placeholder-logo.png",
+        "description": "Free and open tax declaration system for everyone",
+        "sameAs": ["https://twitter.com/monegoo"]
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Taxered Tax Declaration",
+        "url": "https://taxered.stackthrow.com",
+        "description": "Online system for filing tax declarations on property status, income, and investment transactions",
+        "inLanguage": "uk",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Taxered",
+          "url": "https://taxered.stackthrow.com"
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Taxered Tax Declaration",
+        "url": "https://taxered.stackthrow.com",
+        "description": "Online system for filing tax declarations on property status, income, and investment transactions",
+        "applicationCategory": "FinanceApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "featureList": [
+          "Fill tax declarations online",
+          "F0100214 - Property and Income Declaration",
+          "F0121214 - Tax Calculation Annex",
+          "Export to PDF",
+          "Privacy-first: All data stays in your browser"
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <app-root></app-root>
+    <noscript>Для роботи Taxered потрібно увімкнути JavaScript.</noscript>
+  </body>
 </html>

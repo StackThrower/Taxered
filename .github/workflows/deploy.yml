@@ -1,0 +1,60 @@
+name: Publish Docker to GitHub Container Registry
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Build and publish to ghcr
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (for multi-arch, optional)
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute lowercase repo and image tags
+        id: vars
+        run: |
+          repo_lower=$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+          image_sha="ghcr.io/${repo_lower}:${GITHUB_SHA}"
+          image_latest="ghcr.io/${repo_lower}:latest"
+          echo "repo_lower=${repo_lower}" >> $GITHUB_OUTPUT
+          echo "image_sha=${image_sha}" >> $GITHUB_OUTPUT
+          echo "image_latest=${image_latest}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ${{ steps.vars.outputs.image_sha }}
+            ${{ steps.vars.outputs.image_latest }}
+          cache-from: type=registry,ref=ghcr.io/${{ steps.vars.outputs.repo_lower }}:cache
+          cache-to: type=inline
+
+      - name: Output image information
+        run: |
+          echo "IMAGE=${{ steps.vars.outputs.image_sha }}" >> $GITHUB_OUTPUT
+          echo "Image published to ${{ steps.vars.outputs.image_sha }}"

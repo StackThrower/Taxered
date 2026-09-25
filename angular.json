@@ -8,7 +8,11 @@
   "projects": {
     "Taxered": {
       "projectType": "application",
-      "schematics": {},
+      "schematics": {
+        "@schematics/angular:component": {
+          "changeDetection": "OnPush"
+        }
+      },
       "root": "",
       "sourceRoot": "src",
       "prefix": "app",
@@ -25,16 +29,32 @@
               }
             ],
             "styles": [
+              "node_modules/@fontsource-variable/geist/index.css",
               "src/styles.css"
             ],
             "server": "src/main.server.ts",
             "outputMode": "server",
             "security": {
-              "allowedHosts": []
+              "allowedHosts": [
+                "taxered.stackthrow.com",
+                "*.run.app",
+                "localhost",
+                "127.0.0.1"
+              ]
             },
             "ssr": {
               "entry": "src/server.ts"
-            }
+            },
+            "loader": {
+              ".md": "text"
+            },
+            "allowedCommonJsDependencies": [
+              "jspdf",
+              "canvg",
+              "core-js",
+              "raf",
+              "rgbcolor"
+            ]
           },
           "configurations": {
             "production": {
@@ -50,7 +70,8 @@
                   "maximumError": "8kB"
                 }
               ],
-              "outputHashing": "all"
+              "outputHashing": "all",
+              "serviceWorker": "ngsw-config.json"
             },
             "development": {
               "optimization": false,

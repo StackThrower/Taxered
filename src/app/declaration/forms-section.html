@@ -1,0 +1,115 @@
+<section
+  id="forms"
+  class="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 md:py-16"
+  aria-labelledby="forms-title"
+>
+  <div class="space-y-6 md:space-y-8">
+    <div class="space-y-2 text-center">
+      <h2 id="forms-title" class="text-2xl font-bold md:text-3xl">
+        {{ s.title }} - <span aria-hidden="true">{{ country.flag }}</span> {{ country.name }}
+      </h2>
+      <p class="mx-auto max-w-2xl px-4 text-sm text-foreground/70 md:text-base">{{ s.subtitle }}</p>
+    </div>
+
+    <div class="mb-6 md:mb-8">
+      @for (form of forms; track form.id; let first = $first) {
+        <div class="card relative mt-5 transition-colors hover:border-primary/50">
+          <div class="card-header">
+            <h3 class="card-title flex items-center gap-2 text-lg md:text-xl">
+              <svg
+                [appIcon]="icons.FileText"
+                class="size-5"
+                [class]="first ? 'text-primary' : 'text-accent'"
+              ></svg>
+              <!-- The whole card is clickable through the stretched button. -->
+              <button
+                type="button"
+                class="cursor-pointer text-left outline-none after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+                [attr.aria-controls]="'panel-' + form.id"
+                (click)="selectForm(form.id)"
+              >
+                {{ form.title }}
+              </button>
+            </h3>
+            <p class="card-description">{{ form.description }}</p>
+          </div>
+          <div class="card-content space-y-4">
+            <p class="text-sm text-foreground/70">{{ s.year }}: {{ form.year }}</p>
+            <ul class="space-y-2 text-sm text-foreground/70">
+              @for (feature of form.features; track feature) {
+                <li class="flex items-start gap-2">
+                  <svg
+                    [appIcon]="icons.CheckCircle"
+                    class="mt-0.5 size-4"
+                    [class]="first ? 'text-primary' : 'text-accent'"
+                  ></svg>
+                  <span>{{ feature }}</span>
+                </li>
+              }
+            </ul>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (forms.length > 0) {
+      <div #tabs class="w-full scroll-mt-20">
+        <div
+          role="tablist"
+          aria-label="Податкові форми"
+          class="mx-auto grid h-auto w-full max-w-md gap-1 rounded-lg bg-muted p-1"
+          [style.grid-template-columns]="'repeat(' + tabForms.length + ', 1fr)'"
+        >
+          @for (form of tabForms; track form.id; let i = $index) {
+            @let selected = activeTab() === form.id;
+            <button
+              type="button"
+              role="tab"
+              [id]="'tab-' + form.id"
+              [attr.aria-selected]="selected"
+              [attr.aria-controls]="'panel-' + form.id"
+              [attr.tabindex]="selected ? 0 : -1"
+              class="cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-base"
+              [class]="
+                selected
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              (click)="activeTab.set(form.id)"
+              (keydown)="onTabKeydown($event, i)"
+            >
+              {{ form.title }}
+            </button>
+          }
+        </div>
+
+        @for (form of forms; track form.id) {
+          <div
+            role="tabpanel"
+            class="mt-6 md:mt-8"
+            [id]="'panel-' + form.id"
+            [attr.aria-labelledby]="'tab-' + form.id"
+            [hidden]="activeTab() !== form.id"
+          >
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title text-lg md:text-xl">{{ form.title }}</h3>
+                <p class="card-description">{{ form.description }}</p>
+              </div>
+              <div class="card-content px-3 md:px-6">
+                @if (form.id === 'f0121214') {
+                  <app-form-f0121214 />
+                } @else if (!implemented.has(form.id)) {
+                  <div class="alert" role="note">
+                    <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
+                    <p>Форма {{ form.title }} ще в розробці.</p>
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</section>

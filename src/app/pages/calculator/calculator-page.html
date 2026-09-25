@@ -1,0 +1,162 @@
+<section id="calculator" class="px-4 py-16">
+  <div class="mx-auto max-w-4xl">
+    <div class="mb-12 text-center">
+      <h1 class="mb-4 flex items-center justify-center gap-3 text-3xl font-bold md:text-4xl">
+        <svg [appIcon]="icons.Calculator" class="size-8"></svg>
+        {{ s.title }}
+      </h1>
+      <p class="mx-auto max-w-2xl text-lg text-muted-foreground">{{ s.subtitle }}</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">{{ s.inputTitle }}</h2>
+        <p class="card-description">{{ s.inputDescription }}</p>
+      </div>
+      <div class="card-content space-y-6">
+        <div class="space-y-2">
+          <label class="label" for="country">{{ s.selectCountry }}</label>
+          <select id="country" class="input" [formControl]="country">
+            @for (c of countries; track c.code) {
+              <option [value]="c.code">{{ c.flag }} {{ countryNames[c.code] }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="space-y-2">
+          <p class="label" id="income-type-label">{{ s.incomeType }}</p>
+          <div
+            #tablist
+            role="tablist"
+            aria-labelledby="income-type-label"
+            class="grid w-full grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+          >
+            @for (type of incomeTypes; track type) {
+              @let selected = incomeType() === type;
+              <button
+                type="button"
+                role="tab"
+                [id]="'income-tab-' + type"
+                [attr.aria-selected]="selected"
+                aria-controls="income-type-panel"
+                [attr.tabindex]="selected ? 0 : -1"
+                class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                [class]="
+                  selected
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                "
+                (click)="incomeType.set(type)"
+                (keydown)="onTabKeydown($event, tablist)"
+              >
+                <svg
+                  [appIcon]="type === 'salary' ? icons.Briefcase : icons.TrendingUp"
+                  class="size-4"
+                ></svg>
+                {{ type === 'salary' ? s.salary : s.investment }}
+              </button>
+            }
+          </div>
+          <div
+            id="income-type-panel"
+            role="tabpanel"
+            class="mt-4"
+            [attr.aria-labelledby]="'income-tab-' + incomeType()"
+          >
+            @if (incomeType() === 'salary') {
+              <div class="alert border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+                <svg [appIcon]="icons.Briefcase" class="size-4"></svg>
+                <p>{{ s.salaryDescription }}</p>
+              </div>
+            } @else {
+              <div
+                class="alert border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
+              >
+                <svg [appIcon]="icons.TrendingUp" class="size-4"></svg>
+                <p>{{ s.investmentDescription }}</p>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="label" for="income">{{ s.annualIncome }} ({{ currency() }})</label>
+          <input
+            id="income"
+            type="number"
+            class="input"
+            placeholder="50000"
+            inputmode="decimal"
+            [formControl]="income"
+            (keydown.enter)="calculate()"
+          />
+        </div>
+
+        <div class="alert" role="note">
+          <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
+          <p>{{ s.disclaimer }}</p>
+        </div>
+
+        <div class="flex gap-3">
+          <button type="button" class="btn btn-primary flex-1" (click)="calculate()">
+            <svg [appIcon]="icons.Calculator" class="size-4"></svg>
+            {{ s.calculate }}
+          </button>
+          <button type="button" class="btn btn-outline" (click)="reset()">{{ s.reset }}</button>
+        </div>
+
+        <div aria-live="polite">
+          @if (result(); as r) {
+            <hr class="border-border" />
+            <div class="space-y-4 pt-4">
+              <h2 class="text-xl font-semibold">{{ s.results }}</h2>
+
+              <div class="grid gap-4">
+                <div class="flex items-center justify-between rounded-lg bg-muted p-4">
+                  <span class="font-medium">{{ s.grossIncome }}</span>
+                  <span class="text-xl font-bold">{{ currency() }} {{ format(r.income) }}</span>
+                </div>
+
+                @for (item of r.breakdown; track item.label) {
+                  <div class="flex items-center justify-between rounded-lg bg-muted/50 p-3">
+                    <span>
+                      {{ s.labels[item.label] }}
+                      @if (item.rate > 0) {
+                        ({{ item.rate }}%)
+                      }
+                    </span>
+                    <span class="font-semibold text-destructive"
+                      >-{{ currency() }} {{ format(item.value) }}</span
+                    >
+                  </div>
+                }
+
+                <hr class="border-border" />
+
+                <div class="flex items-center justify-between rounded-lg bg-primary/10 p-4">
+                  <span class="font-medium">{{ s.totalTax }}</span>
+                  <span class="text-xl font-bold text-destructive"
+                    >{{ currency() }} {{ format(r.totalTax) }}</span
+                  >
+                </div>
+
+                <div
+                  class="flex items-center justify-between rounded-lg border-2 border-primary bg-primary/10 p-4"
+                >
+                  <span class="text-lg font-bold">{{ s.netIncome }}</span>
+                  <span class="text-2xl font-bold text-primary"
+                    >{{ currency() }} {{ format(r.netIncome) }}</span
+                  >
+                </div>
+
+                <p class="text-center text-sm text-muted-foreground">
+                  {{ s.taxRate }}: {{ r.effectiveRate }}%
+                </p>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
