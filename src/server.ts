@@ -6,8 +6,8 @@ import {
 } from '@angular/ssr/node';
 import express from 'express';
 import { basename, join } from 'node:path';
-import { SITE_URL, localePath } from './app/core/site';
-import { getArticles } from './app/pages/knowledge/articles';
+import { SITE_URL } from './app/core/site';
+import { buildSitemap } from './app/core/sitemap';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
@@ -108,39 +108,16 @@ app.use((req, res, next) => {
 });
 
 /**
- * sitemap.xml, generated from the static pages and the knowledge-base articles.
+ * sitemap.xml. The build also writes it to the browser output (scripts/write-sitemap.mjs)
+ * for static hosting; this route serves it when the Node server runs, including `ng serve`.
  */
 const startedAt = new Date().toISOString();
 
 app.get('/sitemap.xml', (_req, res) => {
-  const pages: { path: string; lastmod: string; changefreq: string; priority: number }[] = [
-    { path: '', lastmod: startedAt, changefreq: 'weekly', priority: 1.0 },
-    { path: localePath(), lastmod: startedAt, changefreq: 'weekly', priority: 0.9 },
-    { path: localePath('about'), lastmod: startedAt, changefreq: 'monthly', priority: 0.6 },
-    { path: localePath('help'), lastmod: startedAt, changefreq: 'weekly', priority: 0.7 },
-    { path: localePath('knowledge'), lastmod: startedAt, changefreq: 'daily', priority: 0.8 },
-    ...getArticles().map((article) => ({
-      path: localePath('knowledge', article.slug),
-      lastmod: new Date(article.updatedAt ?? article.publishedAt).toISOString(),
-      changefreq: 'monthly',
-      priority: 0.7,
-    })),
-  ];
-
-  const urls = pages
-    .map(
-      (page) =>
-        `<url><loc>${SITE_URL}${page.path}</loc><lastmod>${page.lastmod}</lastmod>` +
-        `<changefreq>${page.changefreq}</changefreq><priority>${page.priority}</priority></url>`,
-    )
-    .join('\n');
-
   res
     .type('application/xml')
     .setHeader('Cache-Control', 'public, max-age=3600, must-revalidate')
-    .send(
-      `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls}\n</urlset>\n`,
-    );
+    .send(buildSitemap(startedAt));
 });
 
 /** Files that must always be revalidated so app and service-worker updates are picked up. */
@@ -214,3 +191,6 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
  * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
  */
 export const reqHandler = createNodeRequestHandler(app);
+
+/** Used by scripts/write-sitemap.mjs after the build. */
+export { buildSitemap };
