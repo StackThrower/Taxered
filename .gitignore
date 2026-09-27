@@ -49,3 +49,6 @@ terraform/.terraform/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+
+# Knowledge-base articles compiled by scripts/build-articles.mjs
+/src/app/pages/knowledge/generated

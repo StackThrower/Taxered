@@ -1,12 +1,16 @@
 {
   "name": "taxered",
   "version": "0.0.0",
+  "type": "module",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "articles": "node scripts/build-articles.mjs",
+    "start": "node scripts/build-articles.mjs --watch ng serve",
+    "prebuild": "npm run articles",
     "build": "ng build",
     "postbuild": "node scripts/write-sitemap.mjs",
-    "watch": "ng build --watch --configuration development",
+    "watch": "node scripts/build-articles.mjs --watch ng build --watch --configuration development",
+    "pretest": "npm run articles",
     "test": "ng test",
     "serve:ssr:Taxered": "node dist/Taxered/server/server.mjs"
   },
@@ -27,7 +31,6 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide": "^1.48.0",
-    "marked": "^18.0.14",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
     "xlsx": "^0.18.5"
@@ -40,10 +43,12 @@
     "@types/express": "^5.0.1",
     "@types/node": "^20.17.19",
     "jsdom": "^28.0.0",
+    "marked": "^18.0.14",
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "~6.0.3",
-    "vitest": "^4.0.8"
+    "vitest": "^4.0.8",
+    "yaml": "^2.9.1"
   }
 }

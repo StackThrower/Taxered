@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import { ActivatedRouteSnapshot, Routes } from '@angular/router';
 import { LOCALE } from './core/site';
 
 const homePage = () => import('./pages/home/home-page').then((m) => m.HomePage);
@@ -46,6 +46,13 @@ export const routes: Routes = [
             return !!getArticle(segments.at(-1)?.path ?? '');
           },
         ],
+        // Only the requested article's HTML is loaded; it reaches the page as the `html` input.
+        resolve: {
+          html: async (route: ActivatedRouteSnapshot) => {
+            const { loadArticleHtml } = await import('./pages/knowledge/articles');
+            return loadArticleHtml(route.paramMap.get('slug') ?? '');
+          },
+        },
         loadComponent: () => import('./pages/knowledge/article-page').then((m) => m.ArticlePage),
       },
     ],

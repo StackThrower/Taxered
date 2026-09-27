@@ -6,7 +6,6 @@ import { SeoService } from '../../core/seo.service';
 import { localePath } from '../../core/site';
 import { Icon } from '../../shared/icon';
 import { getArticle, getRelatedArticles } from './articles';
-import { renderMarkdown } from './markdown';
 
 const dateFormat = new Intl.DateTimeFormat('uk-UA', { timeZone: 'UTC' });
 
@@ -72,6 +71,8 @@ const dateFormat = new Intl.DateTimeFormat('uk-UA', { timeZone: 'UTC' });
 export class ArticlePage {
   /** Route parameter (bound via `withComponentInputBinding`). Unknown slugs never match the route. */
   readonly slug = input.required<string>();
+  /** Pre-rendered article body, provided by the route resolver. */
+  readonly html = input.required<string>();
 
   private readonly router = inject(Router);
   private readonly seo = inject(SeoService);
@@ -81,7 +82,6 @@ export class ArticlePage {
   protected readonly listPath = localePath('knowledge');
 
   protected readonly article = computed(() => getArticle(this.slug()));
-  protected readonly html = computed(() => renderMarkdown(this.article()?.content ?? ''));
   protected readonly related = computed(() => getRelatedArticles(this.slug(), 3));
   protected readonly publishedAt = computed(() => {
     const article = this.article();

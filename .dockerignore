@@ -31,5 +31,5 @@ terraform
 .idea
 .claude
 
-# Documentation (articles in src/content are bundled into the app and must stay)
+# Documentation (articles in src/content are compiled into the app and must stay)
 README.md
