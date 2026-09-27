@@ -8,7 +8,6 @@ export const SITE_NAME = 'Taxered Tax Declaration';
 
 export const DEV_ORDER_URL = 'https://stackthrow.com/';
 
-export const CONTACT_EMAIL = '0x01code@gmail.com';
 
 /** Absolute app path for a page under the locale prefix, e.g. `localePath('help')` → `/uk-ua/help`. */
 export function localePath(...segments: string[]): string {

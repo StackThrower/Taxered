@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Calculator, Code, DollarSign, Languages, Lightbulb, Mail, Shield, Target } from 'lucide';
 import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
-import { CONTACT_EMAIL, SITE_URL, localePath } from '../../core/site';
+import { SITE_URL, localePath } from '../../core/site';
 import { Icon } from '../../shared/icon';
 
 @Component({
@@ -72,23 +72,6 @@ import { Icon } from '../../shared/icon';
             </div>
           </div>
 
-          <div class="card bg-muted/50">
-            <div class="card-header">
-              <h2 class="card-title flex items-center gap-2 text-xl md:text-2xl">
-                <svg [appIcon]="icons.Mail" class="size-6 text-primary"></svg>
-                {{ s.contactTitle }}
-              </h2>
-            </div>
-            <div class="card-content space-y-3">
-              <p class="text-sm text-muted-foreground md:text-base">{{ s.contactDescription }}</p>
-              <p class="flex items-center gap-2 text-sm md:text-base">
-                <svg [appIcon]="icons.Mail" class="size-4 text-muted-foreground"></svg>
-                <a [href]="'mailto:' + email" class="break-all text-primary hover:underline">{{
-                  email
-                }}</a>
-              </p>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -96,7 +79,6 @@ import { Icon } from '../../shared/icon';
 })
 export class AboutPage {
   protected readonly s = UK.about;
-  protected readonly email = CONTACT_EMAIL;
   protected readonly icons = { Code, Lightbulb, Mail, Target };
   protected readonly features = [
     { icon: Shield, title: UK.about.features.privacy },
