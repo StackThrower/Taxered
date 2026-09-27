@@ -45,7 +45,8 @@ function contentSecurityPolicy(isLocal: boolean): string {
     // blob: is required by the service worker and by the generated PDFs,
     // which are opened via window.open(doc.output('bloburl')).
     "worker-src 'self' blob:",
-    "frame-src 'self' blob:",
+    // youtube-nocookie hosts the video embedded on the home page.
+    "frame-src 'self' blob: https://www.youtube-nocookie.com",
     "object-src 'self' blob:",
     "manifest-src 'self'",
     "base-uri 'self'",

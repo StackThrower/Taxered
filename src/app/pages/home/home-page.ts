@@ -1,10 +1,13 @@
 import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
 import { LOCALE, SITE_URL, localePath } from '../../core/site';
 import { FormsSection } from '../../declaration/forms-section';
+
+const VIDEO_ID = 'lEdebx3hXeU';
 
 const KEYWORDS = [
   'податкова декларація',
@@ -50,6 +53,28 @@ const KEYWORDS = [
       </div>
     </section>
 
+    <section class="mx-auto max-w-4xl px-4 pt-12 md:pt-16" aria-labelledby="video-title">
+      <div class="space-y-6">
+        <div class="space-y-2 text-center">
+          <h2 id="video-title" class="text-2xl font-bold md:text-3xl">{{ v.title }}</h2>
+          <p class="mx-auto max-w-2xl px-4 text-sm text-foreground/70 md:text-base">
+            {{ v.subtitle }}
+          </p>
+        </div>
+        <div class="aspect-video overflow-hidden rounded-xl border bg-muted">
+          <iframe
+            class="size-full"
+            [src]="videoUrl"
+            [title]="v.frameTitle"
+            loading="lazy"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerpolicy="strict-origin-when-cross-origin"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </section>
+
     <app-forms-section />
   `,
 })
@@ -58,6 +83,11 @@ export class HomePage {
   private readonly seo = inject(SeoService);
 
   protected readonly s = UK.hero;
+  protected readonly v = UK.video;
+  // youtube-nocookie keeps YouTube from setting cookies until the video is played.
+  protected readonly videoUrl = inject(DomSanitizer).bypassSecurityTrustResourceUrl(
+    `https://www.youtube-nocookie.com/embed/${VIDEO_ID}`,
+  );
   protected readonly aboutPath = localePath('about');
 
   constructor() {

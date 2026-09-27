@@ -39,6 +39,11 @@ export const UK = {
     start: 'Почати заповнення',
     learn: 'Дізнатися більше',
   },
+  video: {
+    title: 'Відеоінструкція',
+    subtitle: 'Як заповнити декларацію для Interactive Brokers та Freedom Finance',
+    frameTitle: 'Декларація про майновий стан і доходи: Interactive Brokers та Freedom Finance',
+  },
   forms: {
     title: 'Податкові форми',
     subtitle: 'Виберіть необхідну форму для заповнення',
