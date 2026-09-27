@@ -25,4 +25,5 @@ USER angular
 
 EXPOSE 3000
 
+
 CMD ["node", "dist/Taxered/server/server.mjs"]
