@@ -36,14 +36,14 @@
 
     <div class="flex items-center gap-1 md:gap-2">
       <a
-        [href]="donateUrl"
+        [href]="devOrderUrl"
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         class="btn btn-primary btn-sm hidden md:inline-flex"
-        [attr.aria-label]="s.support"
+        [attr.aria-label]="s.orderWebsite"
       >
-        <svg [appIcon]="icons.Heart" class="size-4"></svg>
-        <span class="hidden lg:inline">{{ s.support }}</span>
+        <svg [appIcon]="icons.Code" class="size-4"></svg>
+        <span class="hidden lg:inline">{{ s.orderWebsite }}</span>
       </a>
       <app-theme-toggle />
       <button
@@ -120,13 +120,13 @@
 
     <div class="mt-auto border-t border-border px-6 py-6">
       <a
-        [href]="donateUrl"
+        [href]="devOrderUrl"
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         class="btn btn-primary btn-lg w-full gap-3 shadow-lg"
       >
-        <svg [appIcon]="icons.Heart" class="size-5 fill-current"></svg>
-        <span class="font-semibold">{{ s.support }}</span>
+        <svg [appIcon]="icons.Code" class="size-5"></svg>
+        <span class="font-semibold">{{ s.orderWebsite }}</span>
       </a>
     </div>
   </div>

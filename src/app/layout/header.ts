@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Calculator, FileText, Heart, HelpCircle, Menu, X } from 'lucide';
+import { Calculator, Code, FileText, HelpCircle, Menu, X } from 'lucide';
 import { UK } from '../core/i18n';
-import { DONATE_URL, localePath } from '../core/site';
+import { DEV_ORDER_URL, localePath } from '../core/site';
 import { Icon } from '../shared/icon';
 import { ThemeToggle } from './theme-toggle';
 
@@ -14,11 +14,11 @@ import { ThemeToggle } from './theme-toggle';
 })
 export class Header {
   protected readonly s = UK.header;
-  protected readonly donateUrl = DONATE_URL;
+  protected readonly devOrderUrl = DEV_ORDER_URL;
   protected readonly homePath = localePath();
   protected readonly calculatorPath = localePath('calculator');
   protected readonly helpPath = localePath('help');
-  protected readonly icons = { Calculator, FileText, Heart, HelpCircle, Menu, X };
+  protected readonly icons = { Calculator, Code, FileText, HelpCircle, Menu, X };
 
   private readonly menu = viewChild.required<ElementRef<HTMLDialogElement>>('menu');
 

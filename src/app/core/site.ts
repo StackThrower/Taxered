@@ -6,7 +6,7 @@ export const LOCALE = 'uk-ua';
 
 export const SITE_NAME = 'Taxered Tax Declaration';
 
-export const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=RMHSQVH59BVPS';
+export const DEV_ORDER_URL = 'https://stackthrow.com/';
 
 export const CONTACT_EMAIL = '0x01code@gmail.com';
 
