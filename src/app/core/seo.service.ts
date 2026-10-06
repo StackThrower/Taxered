@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
-import { SITE_URL } from './site';
+import { SITE_URL, localePath } from './site';
 
 export interface PageSeo {
   /** Page title; ` | Taxered` is appended to the document title unless `bareTitle` is set. */
@@ -88,13 +88,14 @@ export class SeoService {
 
     const links: Record<string, string>[] = [{ rel: 'canonical', href: canonicalUrl }];
     if (alternates) {
+      // Every page in a hreflang cluster must link back to the others, so x-default may only
+      // point at a URL that lists this page in return. Only the home pages (`/` ↔ `/uk-ua`)
+      // form such a pair; any other page is its own x-default.
+      const isHome = path === '/' || path === localePath();
+      const localizedUrl = isHome ? `${SITE_URL}${localePath()}` : canonicalUrl;
       links.push(
-        { rel: 'alternate', hreflang: 'x-default', href: SITE_URL },
-        {
-          rel: 'alternate',
-          hreflang: 'uk-UA',
-          href: `${SITE_URL}${path === '/' ? '/uk-ua' : path}`,
-        },
+        { rel: 'alternate', hreflang: 'x-default', href: isHome ? SITE_URL : localizedUrl },
+        { rel: 'alternate', hreflang: 'uk-UA', href: localizedUrl },
       );
     }
 
