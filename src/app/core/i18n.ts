@@ -188,6 +188,8 @@ export const UK = {
     relatedArticles: 'Схожі статті',
     readTime: 'Час читання',
     publishedAt: 'Опубліковано',
+    author: 'Автор',
+    authorProfile: 'профіль у LinkedIn',
   },
   notFound: {
     title: 'Сторінку не знайдено',

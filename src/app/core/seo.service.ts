@@ -14,6 +14,8 @@ export interface PageSeo {
   type?: 'website' | 'article';
   publishedTime?: string;
   modifiedTime?: string;
+  /** Article author; pages without one fall back to the site name. */
+  author?: { name: string; url: string };
   /** Page-specific schema.org objects; site-wide ones live in index.html. */
   jsonLd?: readonly object[];
   /** Adds `<link rel="alternate" hreflang>` entries (uk-UA + x-default). */
@@ -23,6 +25,7 @@ export interface PageSeo {
 
 const TITLE_SUFFIX = ' | Taxered';
 const OG_IMAGE = `${SITE_URL}/placeholder-logo.png`;
+const DEFAULT_AUTHOR = 'Taxered';
 const ROBOTS = 'index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1';
 
 /** Sets title, meta tags, canonical/alternate links and JSON-LD for the current page. */
@@ -39,6 +42,7 @@ export class SeoService {
     this.title.setTitle(addSuffix ? page.title + TITLE_SUFFIX : page.title);
     this.setName('description', page.description);
     this.setName('robots', page.noindex ? 'noindex, follow' : ROBOTS);
+    this.setName('author', page.author?.name ?? DEFAULT_AUTHOR);
 
     if (page.keywords?.length) {
       this.setName('keywords', page.keywords.join(', '));
@@ -57,6 +61,7 @@ export class SeoService {
     this.setProperty('og:image:alt', page.title);
     this.setOptionalProperty('article:published_time', page.publishedTime);
     this.setOptionalProperty('article:modified_time', page.modifiedTime);
+    this.setOptionalProperty('article:author', page.author?.url);
 
     this.setName('twitter:title', page.title);
     this.setName('twitter:description', page.description);

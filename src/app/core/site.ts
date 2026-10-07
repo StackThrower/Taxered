@@ -8,6 +8,13 @@ export const SITE_NAME = 'Taxered Tax Declaration';
 
 export const DEV_ORDER_URL = 'https://stackthrow.com/';
 
+/** Author of every knowledge-base article. The avatar is served from `public/`. */
+export const ARTICLE_AUTHOR = {
+  name: 'Volodymyr Sydorenko',
+  url: 'https://www.linkedin.com/in/uncle-vlad/',
+  image: '/authors/volodymyr-sydorenko.jpg',
+} as const;
+
 
 /** Absolute app path for a page under the locale prefix, e.g. `localePath('help')` → `/uk-ua/help`. */
 export function localePath(...segments: string[]): string {

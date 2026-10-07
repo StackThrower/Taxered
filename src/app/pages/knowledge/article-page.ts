@@ -1,9 +1,10 @@
+import { NgOptimizedImage } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { ArrowLeft } from 'lucide';
 import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
-import { localePath } from '../../core/site';
+import { ARTICLE_AUTHOR, SITE_NAME, SITE_URL, localePath } from '../../core/site';
 import { Icon } from '../../shared/icon';
 import { getArticle, getRelatedArticles } from './articles';
 
@@ -11,7 +12,7 @@ const dateFormat = new Intl.DateTimeFormat('uk-UA', { timeZone: 'UTC' });
 
 @Component({
   selector: 'app-article-page',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, NgOptimizedImage, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (article(); as article) {
@@ -34,6 +35,26 @@ const dateFormat = new Intl.DateTimeFormat('uk-UA', { timeZone: 'UTC' });
           </div>
           <h1 class="mb-4 text-4xl font-bold md:text-5xl">{{ article.title }}</h1>
           <p class="text-xl text-muted-foreground">{{ article.description }}</p>
+          <p class="mt-6 flex items-center gap-3">
+            <img
+              [ngSrc]="author.image"
+              width="40"
+              height="40"
+              alt=""
+              class="size-10 rounded-full object-cover"
+            />
+            <span class="text-sm">
+              <span class="sr-only">{{ s.author }}: </span>
+              <a
+                [href]="author.url"
+                target="_blank"
+                rel="author noopener noreferrer"
+                class="font-medium underline-offset-4 hover:underline"
+              >
+                {{ author.name }}<span class="sr-only"> ({{ s.authorProfile }})</span>
+              </a>
+            </span>
+          </p>
         </header>
 
         <div
@@ -80,6 +101,7 @@ export class ArticlePage {
   protected readonly s = UK.knowledge;
   protected readonly ArrowLeft = ArrowLeft;
   protected readonly listPath = localePath('knowledge');
+  protected readonly author = ARTICLE_AUTHOR;
 
   protected readonly article = computed(() => getArticle(this.slug()));
   protected readonly related = computed(() => getRelatedArticles(this.slug(), 3));
@@ -95,14 +117,38 @@ export class ArticlePage {
       if (!article) {
         return;
       }
+      const path = localePath('knowledge', article.slug);
+      const modifiedTime = article.updatedAt ?? article.publishedAt;
       this.seo.setPage({
         title: article.title,
         description: article.description,
         keywords: article.keywords,
-        path: localePath('knowledge', article.slug),
+        path,
         type: 'article',
         publishedTime: article.publishedAt,
-        modifiedTime: article.updatedAt ?? article.publishedAt,
+        modifiedTime,
+        author: ARTICLE_AUTHOR,
+        jsonLd: [
+          {
+            '@context': 'https://schema.org',
+            '@type': 'Article',
+            headline: article.title,
+            description: article.description,
+            url: `${SITE_URL}${path}`,
+            inLanguage: 'uk',
+            datePublished: article.publishedAt,
+            dateModified: modifiedTime,
+            keywords: article.keywords.join(', '),
+            author: {
+              '@type': 'Person',
+              name: ARTICLE_AUTHOR.name,
+              url: ARTICLE_AUTHOR.url,
+              image: `${SITE_URL}${ARTICLE_AUTHOR.image}`,
+              sameAs: [ARTICLE_AUTHOR.url],
+            },
+            publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+          },
+        ],
       });
     });
   }

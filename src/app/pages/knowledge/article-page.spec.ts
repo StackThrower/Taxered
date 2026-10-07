@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../../app.routes';
+import { ARTICLE_AUTHOR } from '../../core/site';
 import { getArticle, loadArticleHtml } from './articles';
 
 /** The article HTML as the DOM serializes it (e.g. `&#39;` becomes `'`). */
@@ -25,6 +26,9 @@ describe('ArticlePage', () => {
     await harness.navigateByUrl('/uk-ua/knowledge/tax-basics');
     expect(query('h1')?.textContent).toBe(getArticle('tax-basics')?.title);
     expect(query('.article-content')?.innerHTML).toBe(await articleBody('tax-basics'));
+    const authorLink = query(`header a[href="${ARTICLE_AUTHOR.url}"]`);
+    expect(authorLink?.textContent).toContain(ARTICLE_AUTHOR.name);
+    expect(query('header img')?.getAttribute('src')).toBe(ARTICLE_AUTHOR.image);
 
     // The page component is reused between articles, so the resolver must re-run.
     await harness.navigateByUrl('/uk-ua/knowledge/crypto-tax');
