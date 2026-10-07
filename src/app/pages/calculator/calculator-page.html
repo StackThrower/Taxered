@@ -54,6 +54,20 @@
             </p>
           </div>
         }
+        <div class="space-y-1 md:col-span-2">
+          <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              class="size-4 accent-primary"
+              formControlName="hideAmounts"
+              aria-describedby="hideAmounts-hint"
+            />
+            {{ s.hideAmounts }}
+          </label>
+          <p id="hideAmounts-hint" class="text-sm text-muted-foreground">
+            {{ s.hideAmountsHint }}
+          </p>
+        </div>
       </div>
     </div>
 
@@ -157,7 +171,9 @@
                   type="number"
                   class="input"
                   inputmode="decimal"
-                  [placeholder]="fromStatement === null ? '0' : fromStatement.toFixed(0)"
+                  [placeholder]="
+                    fromStatement === null ? '0' : hideAmounts() ? '****' : fromStatement.toFixed(0)
+                  "
                   [formControl]="group.controls.deposits"
                   [attr.aria-describedby]="'deposits-hint-' + year"
                 />

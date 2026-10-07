@@ -65,6 +65,7 @@ export class CalculatorPage {
     currency: control<DisplayCurrency>('USD'),
     includeTaxes: control(true),
     taxesPaidSeparately: control(false),
+    hideAmounts: control(false),
   });
   protected readonly years = new FormArray<YearGroup>([]);
   protected readonly yearToAdd = control(CURRENT_YEAR - 1);
@@ -183,17 +184,20 @@ export class CalculatorPage {
     signDisplay: 'exceptZero',
   });
 
+  /** Amounts are shown as asterisks (sign and currency kept); percentages stay visible. */
+  protected readonly hideAmounts = computed(() => this.settingsValue().hideAmounts);
+
   protected readonly money = computed(() => {
-    const f = this.moneyFormat();
-    return (value: number) => f.format(value);
+    const format = formatter(this.moneyFormat(), this.hideAmounts());
+    return (value: number) => format(value);
   });
   protected readonly signedMoney = computed(() => {
-    const f = this.moneyFormat();
-    return (value: number) => (value > 0 ? '+' : '') + f.format(value);
+    const format = formatter(this.moneyFormat(), this.hideAmounts());
+    return (value: number) => (value > 0 ? '+' : '') + format(value);
   });
   protected readonly compactMoney = computed(() => {
-    const f = this.compactFormat();
-    return (value: number) => f.format(value);
+    const format = formatter(this.compactFormat(), this.hideAmounts());
+    return (value: number) => format(value);
   });
   protected readonly percent = (value: number | null) =>
     value === null ? '—' : `${this.percentFormat.format(value)} %`;
@@ -479,6 +483,31 @@ export class CalculatorPage {
       ],
     });
   }
+}
+
+const HIDDEN_AMOUNT = '****';
+const NUMBER_PARTS = new Set(['integer', 'group', 'decimal', 'fraction', 'compact']);
+
+/** Formats amounts, or with `hidden` replaces the number with asterisks. */
+function formatter(format: Intl.NumberFormat, hidden: boolean): (value: number) => string {
+  if (!hidden) {
+    return (value) => format.format(value);
+  }
+  return (value) => {
+    let masked = false;
+    return format
+      .formatToParts(value)
+      .map((part) => {
+        if (!NUMBER_PARTS.has(part.type)) {
+          return part.value;
+        }
+        const text = masked ? '' : HIDDEN_AMOUNT;
+        masked = true;
+        return text;
+      })
+      .join('')
+      .replace(/(\s)\s+/g, '$1');
+  };
 }
 
 function errorText(error: unknown): string {
