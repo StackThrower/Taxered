@@ -13,7 +13,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { AlertCircle, FileText, LineChart as LineChartIcon, Plus, Trash2, Upload, X } from 'lucide';
 import { map, startWith } from 'rxjs';
 import { UK } from '../../core/i18n';
@@ -27,9 +26,17 @@ import {
 import { fetchYearEndUSDRate } from '../../lib/nbu-exchange-rates';
 import { Icon } from '../../shared/icon';
 import { BarChart } from './bar-chart';
+import type { BrokerReport } from './broker-import';
 import { ChartSeries } from './chart-utils';
 import { LineChart } from './line-chart';
-import { DisplayCurrency, FileIncome, YearInput, analyzeReturns } from './returns-model';
+import {
+  DisplayCurrency,
+  FileIncome,
+  YearInput,
+  analyzeReturns,
+  startingCapital,
+  statementYear,
+} from './returns-model';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -45,19 +52,17 @@ function control<T>(value: T): FormControl<T> {
 
 @Component({
   selector: 'app-calculator-page',
-  imports: [ReactiveFormsModule, RouterLink, Icon, BarChart, LineChart],
+  imports: [ReactiveFormsModule, Icon, BarChart, LineChart],
   templateUrl: './calculator-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CalculatorPage {
   protected readonly s = UK.calculator;
   protected readonly icons = { AlertCircle, FileText, LineChartIcon, Plus, Trash2, Upload, X };
-  protected readonly ibGuidePath = localePath('knowledge', 'flex-report-ib');
   protected readonly preliminaryYear = PRELIMINARY_INFLATION_YEAR;
 
   protected readonly settings = new FormGroup({
     currency: control<DisplayCurrency>('USD'),
-    initialCapital: control(''),
     includeTaxes: control(true),
   });
   protected readonly years = new FormArray<YearGroup>([]);
@@ -71,6 +76,8 @@ export class CalculatorPage {
   /** NBU UAH per USD at the end of each year, for the exchange-rate difference. */
   private readonly usdRates = signal<Record<number, number | null>>({});
   private readonly requestedRates = new Set<number>();
+  /** Reports as read, per year: CSV statements are recalculated when the set of them changes. */
+  private readonly reports = new Map<number, BrokerReport[]>();
   private uploadYear = 0;
 
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
@@ -103,18 +110,48 @@ export class CalculatorPage {
     Object.values(this.files()).some((list) => list.length > 0),
   );
 
+  /** The account value when the first year begins, from its statements. */
+  protected readonly startCapital = computed(() => {
+    const years = this.addedYears();
+    if (years.length === 0) {
+      return null;
+    }
+    const first = Math.min(...years);
+    const capital = startingCapital(Object.values(this.files()).flat(), first);
+    return capital && { ...capital, value: this.fromUsd(capital.value, first - 1) };
+  });
+
+  /** Deposits and the account's gain per year, in USD, from the statements within the year. */
+  private readonly statementYears = computed(() => {
+    const files = Object.values(this.files()).flat();
+    return new Map(this.addedYears().map((year) => [year, statementYear(files, year)]));
+  });
+
+  /** Deposits per year from the statements, used where the field is left empty. */
+  protected readonly statementDeposits = computed(() => {
+    const deposits: Record<number, number | null> = {};
+    for (const [year, statement] of this.statementYears()) {
+      deposits[year] = statement && this.fromUsd(statement.deposits, year - 1);
+    }
+    return deposits;
+  });
+
   protected readonly analysis = computed(() => {
     const files = this.files();
-    const { currency, initialCapital, includeTaxes } = this.settingsValue();
+    const { currency, includeTaxes } = this.settingsValue();
+    const statementDeposits = this.statementDeposits();
+    const statementYears = this.statementYears();
     const years: YearInput[] = this.yearsValue().map((y) => ({
       year: y.year,
       files: files[y.year] ?? [],
-      deposits: parseFloat(y.deposits) || 0,
+      deposits:
+        y.deposits.trim() === '' ? (statementDeposits[y.year] ?? 0) : parseFloat(y.deposits) || 0,
       inflation: parseFloat(y.inflation) || 0,
+      accountGainUsd: statementYears.get(y.year)?.gain ?? null,
     }));
     return analyzeReturns(years, {
       currency,
-      initialCapital: Math.max(0, parseFloat(initialCapital) || 0),
+      initialCapital: Math.max(0, this.startCapital()?.value ?? 0),
       includeTaxes,
       usdRates: this.usdRates(),
     });
@@ -267,16 +304,26 @@ export class CalculatorPage {
 
   protected removeYear(index: number): void {
     const year = this.years.at(index).controls.year.value;
+    const removed = this.reports.get(year) ?? [];
     this.years.removeAt(index);
+    this.reports.delete(year);
     this.files.update(({ [year]: _, ...rest }) => rest);
     this.errors.update(({ [year]: _, ...rest }) => rest);
+    if (removed.length > 0) {
+      void this.recalculate();
+    }
   }
 
   protected removeFile(year: number, name: string): void {
+    this.reports.set(
+      year,
+      (this.reports.get(year) ?? []).filter((r) => r.name !== name),
+    );
     this.files.update((all) => ({
       ...all,
       [year]: (all[year] ?? []).filter((f) => f.name !== name),
     }));
+    void this.recalculate();
   }
 
   protected chooseFiles(year: number): void {
@@ -296,35 +343,89 @@ export class CalculatorPage {
     const errors: string[] = [];
     this.importStatus.set({ year, text: `${this.s.importing}…` });
     try {
-      const { importBrokerReport } = await import('./broker-import');
-
-      for (const [i, file] of chosen.entries()) {
-        if ((this.files()[year] ?? []).some((f) => f.name === file.name)) {
+      const { readBrokerReport } = await import('./broker-import');
+      const reports = [...(this.reports.get(year) ?? [])];
+      for (const file of chosen) {
+        if (reports.some((r) => r.name === file.name)) {
           errors.push(`${file.name}: ${this.s.duplicateFile}`);
           continue;
         }
         try {
-          const income = await importBrokerReport(file, year, (done, total) =>
-            this.importStatus.set({
-              year,
-              text: `${this.s.importing} ${file.name} (${i + 1}/${chosen.length}): ${done}/${total}`,
-            }),
-          );
-          this.files.update((all) => ({ ...all, [year]: [...(all[year] ?? []), income] }));
+          reports.push(await readBrokerReport(file));
         } catch (error) {
-          errors.push(
-            `${this.s.importFailed} ${file.name}: ${error instanceof Error ? error.message : String(error)}`,
-          );
+          errors.push(`${this.s.importFailed} ${file.name}: ${errorText(error)}`);
         }
       }
-    } finally {
+      this.reports.set(year, reports);
       this.errors.update((all) => ({ ...all, [year]: errors }));
+      // A new statement may hold the purchases of other years' sales.
+      await this.recalculate();
+    } finally {
       this.importStatus.set(null);
     }
   }
 
-  protected sourceName(file: FileIncome): string {
-    return file.source === 'interactive_brokers' ? 'IB' : 'Freedom';
+  /**
+   * Calculates every statement against the trade history of all of them, replacing earlier
+   * results; runs whenever the set of statements changes.
+   */
+  private async recalculate(): Promise<void> {
+    const { importBrokerReport } = await import('./broker-import');
+    const targets = [...this.reports].flatMap(([year, reports]) =>
+      reports.map((report) => ({ year, report })),
+    );
+    const history = targets.map((t) => t.report.statement);
+    if (targets.length > 0) {
+      this.importStatus.set({ year: targets[0].year, text: `${this.s.importing}…` });
+    }
+
+    try {
+      for (const [i, { year, report }] of targets.entries()) {
+        try {
+          const income = await importBrokerReport(
+            report,
+            year,
+            (done, total) =>
+              this.importStatus.set({
+                year,
+                text: `${this.s.importing} ${report.name} (${i + 1}/${targets.length}): ${done}/${total}`,
+              }),
+            history,
+          );
+          this.files.update((all) => {
+            const list = all[year] ?? [];
+            return {
+              ...all,
+              [year]: list.some((f) => f.name === report.name)
+                ? list.map((f) => (f.name === report.name ? income : f))
+                : [...list, income],
+            };
+          });
+        } catch (error) {
+          this.reports.set(
+            year,
+            (this.reports.get(year) ?? []).filter((r) => r !== report),
+          );
+          this.errors.update((all) => ({
+            ...all,
+            [year]: [
+              ...(all[year] ?? []),
+              `${this.s.importFailed} ${report.name}: ${errorText(error)}`,
+            ],
+          }));
+        }
+      }
+    } finally {
+      this.importStatus.set(null);
+    }
+  }
+
+  /**
+   * A dollar amount in the chosen currency; in UAH at the NBU rate at the end of `rateYear`
+   * (0 until that rate is loaded). Statement values are in the account's dollars.
+   */
+  private fromUsd(usd: number, rateYear: number): number {
+    return this.currency() === 'UAH' ? usd * (this.usdRates()[rateYear] ?? 0) : usd;
   }
 
   protected fileIncome(file: FileIncome): number {
@@ -339,13 +440,13 @@ export class CalculatorPage {
     inject(SeoService).setPage({
       title: `Калькулятор дохідності інвестицій з урахуванням інфляції ${CURRENT_YEAR} | Taxered`,
       description:
-        'Безкоштовний калькулятор реальної дохідності інвестицій за звітами Interactive Brokers та Freedom Finance. Дохідність за роками, податки, інфляція та крива капіталу.',
+        'Безкоштовний калькулятор реальної дохідності інвестицій за CSV-виписками Interactive Brokers. Дохідність за роками, податки, інфляція та крива капіталу.',
       keywords: [
         'калькулятор дохідності',
         'реальна дохідність',
         'інфляція',
         'Interactive Brokers',
-        'Freedom Finance',
+        'виписка IB CSV',
         'крива капіталу',
         'дохідність інвестицій',
         'ПДФО інвестиції',
@@ -376,4 +477,8 @@ export class CalculatorPage {
       ],
     });
   }
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

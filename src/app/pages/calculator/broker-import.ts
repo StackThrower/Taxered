@@ -1,28 +1,72 @@
-import { parseAnyBrokerXML, readFileAsText } from '../../lib/ib-xml-parser';
+import {
+  IbCsvStatement,
+  RealizedAmount,
+  ibCsvYearIncome,
+  isIbCsvStatement,
+  parseIbCsvStatement,
+} from '../../lib/ib-csv-parser';
 import { fetchNBUExchangeRate } from '../../lib/nbu-exchange-rates';
 import type { FileIncome } from './returns-model';
 
 /** Parallel NBU requests per import; enough to be quick without hammering the API. */
 const CONCURRENCY = 6;
 
+/** An Interactive Brokers CSV statement as read. */
+export interface BrokerReport {
+  name: string;
+  statement: IbCsvStatement;
+}
+
+export async function readBrokerReport(file: File): Promise<BrokerReport> {
+  const content = await file.text();
+  if (!isIbCsvStatement(content)) {
+    throw new Error('це не CSV-виписка Interactive Brokers (Activity Statement)');
+  }
+  return { name: file.name, statement: parseIbCsvStatement(content) };
+}
+
 /**
- * Reads an Interactive Brokers or Freedom Finance XML report and sums the realized
- * income of `year` in UAH (NBU rates, as for the declaration) and in USD.
+ * Sums the realized income of `year` in an Interactive Brokers CSV statement, in UAH (NBU
+ * rates, as for the declaration) and in USD. `history` holds every statement uploaded: the
+ * statement does not list the lots a sale closes, so their purchase dates come from there.
  */
 export async function importBrokerReport(
-  file: File,
+  report: BrokerReport,
   year: number,
   onProgress: (done: number, total: number) => void,
+  history: readonly IbCsvStatement[],
 ): Promise<FileIncome> {
-  const content = await readFileAsText(file);
-  const parsed = parseAnyBrokerXML(content, file.name, year);
-  const warnings = [...parsed.warnings];
+  const { statement } = report;
+  const { amounts, trades, dividends, unmatched } = ibCsvYearIncome(statement, history, year);
+
+  const warnings: string[] = [];
+  if (trades === 0 && dividends === 0) {
+    const period = statement.period ? ` (${statement.period})` : '';
+    warnings.push(
+      `У виписці${period} немає закритих угод і дивідендів за ${year} — її використано лише для дат купівлі.`,
+    );
+  }
+  if (unmatched > 0) {
+    warnings.push(
+      `Для ${unmatched} продажів не знайдено купівлі в завантажених виписках — їх оцінено за курсом НБУ на дату продажу. Додайте виписки за роки, коли купували ці папери.`,
+    );
+  }
+  if (statement.forexTrades > 0) {
+    warnings.push(`Конвертації валют (${statement.forexTrades}) не враховано.`);
+  }
 
   const income: FileIncome = {
-    name: file.name,
-    source: parsed.source,
-    trades: 0,
-    dividends: 0,
+    name: report.name,
+    account: {
+      id: statement.account,
+      start: statement.start,
+      end: statement.end,
+      startingValue: statement.startingValue,
+      endingValue: statement.endingValue,
+      deposits: statement.deposits,
+    },
+    trades,
+    dividends,
     tradesUah: 0,
     fxUah: 0,
     dividendsUah: 0,
@@ -33,24 +77,22 @@ export async function importBrokerReport(
 
   let done = 0;
   let skipped = 0;
-  onProgress(0, parsed.positions.length);
+  onProgress(0, amounts.length);
 
-  await forEachLimited(parsed.positions, CONCURRENCY, async (position) => {
-    const amounts = await positionIncome(position);
-    onProgress(++done, parsed.positions.length);
-    if (!amounts) {
+  await forEachLimited(amounts, CONCURRENCY, async (amount) => {
+    const result = await amountIncome(amount);
+    onProgress(++done, amounts.length);
+    if (!result) {
       skipped++;
       return;
     }
-    if (position.assetType === 'dividends') {
-      income.dividends++;
-      income.dividendsUah += amounts.uah;
-      income.dividendsUsd += amounts.usd;
+    if (amount.kind === 'dividend') {
+      income.dividendsUah += result.uah;
+      income.dividendsUsd += result.usd;
     } else {
-      income.trades++;
-      income.tradesUah += amounts.uah;
-      income.fxUah += amounts.fx;
-      income.tradesUsd += amounts.usd;
+      income.tradesUah += result.uah;
+      income.fxUah += result.fx;
+      income.tradesUsd += result.usd;
     }
   });
 
@@ -60,48 +102,35 @@ export async function importBrokerReport(
   return income;
 }
 
-interface PositionAmounts {
-  currency: string;
-  assetType: string;
-  purchaseDate: string;
-  saleDate: string;
-  purchasePriceForeign: string;
-  salePriceForeign: string;
-  expenses: string;
-}
-
 /**
  * Profit of one closed position (or dividend) in UAH and USD, and the exchange-rate part of
  * the UAH profit: what is left after valuing the dollar profit at the sale-date rate.
  * `null` if a rate is missing.
  */
-async function positionIncome(
-  p: PositionAmounts,
+async function amountIncome(
+  a: RealizedAmount,
 ): Promise<{ uah: number; usd: number; fx: number } | null> {
-  const purchase = parseFloat(p.purchasePriceForeign) || 0;
-  const sale = parseFloat(p.salePriceForeign) || 0;
-  const expenses = parseFloat(p.expenses) || 0;
   // Dividends have no purchase; positions without a purchase date are valued on the sale date.
-  const purchaseDate = p.assetType === 'dividends' || !p.purchaseDate ? p.saleDate : p.purchaseDate;
+  const purchaseDate = a.kind === 'dividend' || !a.purchaseDate ? a.saleDate : a.purchaseDate;
 
   const [saleRate, purchaseRate] = await Promise.all([
-    fetchNBUExchangeRate(p.saleDate, p.currency),
-    fetchNBUExchangeRate(purchaseDate, p.currency),
+    fetchNBUExchangeRate(a.saleDate, a.currency),
+    fetchNBUExchangeRate(purchaseDate, a.currency),
   ]);
   if (saleRate === null || purchaseRate === null) {
     return null;
   }
-  const saleUah = (sale - expenses) * saleRate;
-  const purchaseUah = purchase * purchaseRate;
+  const saleUah = (a.sale - a.expenses) * saleRate;
+  const purchaseUah = a.purchase * purchaseRate;
   const uah = saleUah - purchaseUah;
 
-  if (p.currency === 'USD') {
-    const usd = sale - expenses - purchase;
+  if (a.currency === 'USD') {
+    const usd = a.sale - a.expenses - a.purchase;
     return { uah, usd, fx: uah - usd * saleRate };
   }
 
   const [saleUsdRate, purchaseUsdRate] = await Promise.all([
-    fetchNBUExchangeRate(p.saleDate, 'USD'),
+    fetchNBUExchangeRate(a.saleDate, 'USD'),
     fetchNBUExchangeRate(purchaseDate, 'USD'),
   ]);
   if (saleUsdRate === null || purchaseUsdRate === null) {

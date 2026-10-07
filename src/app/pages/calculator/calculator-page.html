@@ -24,22 +24,15 @@
           </select>
         </div>
         <div class="space-y-2">
-          <label class="label" for="initialCapital"
-            >{{ s.initialCapital }} ({{ currency() }})</label
-          >
-          <input
-            id="initialCapital"
-            type="number"
-            min="0"
-            class="input"
-            inputmode="decimal"
-            placeholder="10000"
-            formControlName="initialCapital"
-            aria-describedby="initialCapital-hint"
-          />
-          <p id="initialCapital-hint" class="text-sm text-muted-foreground">
-            {{ s.initialCapitalHint }}
-          </p>
+          <h3 class="label">{{ s.initialCapital }}</h3>
+          @if (startCapital(); as capital) {
+            <p class="text-2xl font-semibold tabular-nums">{{ money()(capital.value) }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ s.initialCapitalFrom }} {{ capital.date }}
+            </p>
+          } @else {
+            <p class="text-sm text-muted-foreground">{{ s.initialCapitalHint }}</p>
+          }
         </div>
         <label class="inline-flex cursor-pointer items-center gap-2 text-sm md:col-span-2">
           <input type="checkbox" class="size-4 accent-primary" formControlName="includeTaxes" />
@@ -52,18 +45,14 @@
     <div class="card">
       <div class="card-header">
         <h2 class="card-title">{{ s.reportsTitle }}</h2>
-        <p class="card-description">
-          {{ s.reportsDescription }}
-          <a [routerLink]="ibGuidePath" class="text-primary underline underline-offset-4">{{
-            s.ibGuide
-          }}</a>
-        </p>
+        <p class="card-description">{{ s.reportsDescription }}</p>
       </div>
       <div class="card-content space-y-4">
+        <p class="text-sm text-muted-foreground">{{ s.csvHint }}</p>
         <input
           #fileInput
           type="file"
-          accept=".xml,text/xml,application/xml"
+          accept=".csv,text/csv"
           multiple
           class="hidden"
           tabindex="-1"
@@ -112,7 +101,6 @@
                   <li class="rounded-md bg-muted/50 px-3 py-2 text-sm">
                     <div class="flex items-center gap-2">
                       <svg [appIcon]="icons.FileText" class="size-4 text-muted-foreground"></svg>
-                      <span class="badge">{{ sourceName(file) }}</span>
                       <span class="min-w-0 flex-1 truncate">{{ file.name }}</span>
                       <span class="hidden text-muted-foreground sm:inline">
                         {{ file.trades }} {{ s.trades }}, {{ file.dividends }} {{ s.dividends }}
@@ -123,6 +111,7 @@
                       <button
                         type="button"
                         class="btn btn-ghost btn-sm size-8 px-0"
+                        [disabled]="busy"
                         [attr.aria-label]="s.removeFile + ' ' + file.name"
                         (click)="removeFile(year, file.name)"
                       >
@@ -146,16 +135,20 @@
                 <label class="label" [for]="'deposits-' + year"
                   >{{ s.deposits }} ({{ currency() }})</label
                 >
+                @let fromStatement = statementDeposits()[year] ?? null;
                 <input
                   [id]="'deposits-' + year"
                   type="number"
                   class="input"
                   inputmode="decimal"
-                  placeholder="0"
+                  [placeholder]="fromStatement === null ? '0' : fromStatement.toFixed(0)"
                   [formControl]="group.controls.deposits"
                   [attr.aria-describedby]="'deposits-hint-' + year"
                 />
                 <p [id]="'deposits-hint-' + year" class="text-sm text-muted-foreground">
+                  @if (fromStatement !== null) {
+                    {{ s.depositsFromStatement }} {{ money()(fromStatement) }}.
+                  }
                   {{ s.depositsHint }}
                 </p>
               </div>
@@ -250,6 +243,11 @@
         <div class="card gap-1 px-6">
           <p class="text-sm text-muted-foreground">{{ s.totalNet }}</p>
           <p class="text-2xl font-semibold">{{ signedMoney()(a.net) }}</p>
+          @if (a.unrealized !== 0) {
+            <p class="text-sm text-muted-foreground">
+              {{ s.unrealizedPart }}: {{ signedMoney()(a.unrealized) }}
+            </p>
+          }
         </div>
         @if (uah) {
           <div class="card gap-1 px-6">
@@ -333,6 +331,9 @@
                   <th scope="col" class="py-2 pr-4 text-right font-medium">
                     {{ s.colDividends }}
                   </th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    {{ s.colUnrealized }}
+                  </th>
                   @if (uah) {
                     <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colFx }}</th>
                   }
@@ -368,6 +369,7 @@
                     </th>
                     <td class="py-2 pr-4 text-right">{{ money()(r.trades) }}</td>
                     <td class="py-2 pr-4 text-right">{{ money()(r.dividends) }}</td>
+                    <td class="py-2 pr-4 text-right">{{ signedMoney()(r.unrealized) }}</td>
                     @if (uah) {
                       <td class="py-2 pr-4 text-right">{{ signedMoney()(r.fx) }}</td>
                     }
@@ -393,6 +395,7 @@
                 <tr class="font-semibold">
                   <th scope="row" class="py-2 pr-4 text-left">{{ s.total }}</th>
                   <td class="py-2 pr-4 text-right" colspan="2">{{ money()(a.gross) }}</td>
+                  <td class="py-2 pr-4 text-right">{{ signedMoney()(a.unrealized) }}</td>
                   @if (uah) {
                     <td class="py-2 pr-4 text-right">{{ signedMoney()(a.fx) }}</td>
                   }

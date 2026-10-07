@@ -1,8 +1,16 @@
-import { AnalysisOptions, FileIncome, YearInput, analyzeReturns } from './returns-model';
+import {
+  AnalysisOptions,
+  FileIncome,
+  StatementAccount,
+  YearInput,
+  analyzeReturns,
+  startingCapital,
+  statementYear,
+} from './returns-model';
 
 const report = (tradesUsd: number, dividendsUsd = 0, rate = 40, fxUah = 0): FileIncome => ({
-  name: 'report.xml',
-  source: 'interactive_brokers',
+  name: 'report.csv',
+  account: { id: 'U1', start: '', end: '', startingValue: 0, endingValue: 0, deposits: 0 },
   trades: 1,
   dividends: dividendsUsd ? 1 : 0,
   tradesUah: tradesUsd * rate + fxUah,
@@ -156,5 +164,120 @@ describe('analyzeReturns', () => {
 
     expect(a.fx).toBe(0);
     expect(a.net).toBe(1000);
+  });
+});
+
+describe('statement capital', () => {
+  const statement = (account: Partial<StatementAccount>): FileIncome => ({
+    ...report(0),
+    account: {
+      id: 'U1',
+      start: '',
+      end: '',
+      startingValue: 0,
+      endingValue: 0,
+      deposits: 0,
+      ...account,
+    },
+  });
+  const files = [
+    statement({
+      start: '2024-01-01',
+      end: '2024-12-31',
+      startingValue: 0,
+      endingValue: 54000,
+      deposits: 50000,
+    }),
+    statement({
+      start: '2025-01-01',
+      end: '2025-12-31',
+      startingValue: 54000,
+      endingValue: 60000,
+      deposits: 2000,
+    }),
+    // The same account's statement for part of the year, uploaded again elsewhere.
+    statement({ start: '2025-01-01', end: '2025-06-30', startingValue: 54000, deposits: 1000 }),
+    statement({
+      id: 'U2',
+      start: '2025-03-01',
+      end: '2025-12-31',
+      startingValue: 100,
+      endingValue: 100,
+    }),
+    statement({ start: '2025-01-01', end: '2026-10-05', startingValue: 54000, deposits: 9000 }),
+  ];
+
+  it('sums the starting value of each account from its earliest statement of the year', () => {
+    expect(startingCapital(files, 2025)).toEqual({ value: 54100, date: '2025-01-01' });
+    expect(startingCapital(files, 2024)).toEqual({ value: 0, date: '2024-01-01' });
+    expect(startingCapital(files, 2023)).toBeNull();
+  });
+
+  it('takes the deposits and the gain of the statements within the year', () => {
+    expect(statementYear(files, 2024)).toEqual({ deposits: 50000, gain: 4000 });
+    expect(statementYear(files, 2025)).toEqual({ deposits: 2000, gain: 4000 });
+    expect(statementYear(files, 2026)).toBeNull();
+  });
+});
+
+describe('account value from statements', () => {
+  const options: AnalysisOptions = {
+    currency: 'USD',
+    initialCapital: 10000,
+    includeTaxes: false,
+    usdRates: { 2024: 40, 2025: 42 },
+  };
+
+  it('follows the account value, splitting the gain into realized and the rest', () => {
+    const a = analyzeReturns(
+      [
+        {
+          year: 2025,
+          files: [report(300, 100, 40)],
+          deposits: 2000,
+          inflation: 0,
+          accountGainUsd: 1500,
+        },
+      ],
+      options,
+    );
+    expect(a.rows[0].trades).toBe(300);
+    expect(a.rows[0].dividends).toBe(100);
+    expect(a.rows[0].unrealized).toBe(1100);
+    expect(a.finalCapital).toBe(13500);
+    expect(a.unrealized).toBe(1100);
+  });
+
+  it('takes the tax on realized income out of the account value', () => {
+    const a = analyzeReturns(
+      [
+        {
+          year: 2025,
+          files: [report(300, 100, 40)],
+          deposits: 0,
+          inflation: 0,
+          accountGainUsd: 1500,
+        },
+      ],
+      { ...options, includeTaxes: true },
+    );
+    expect(a.rows[0].tax).toBeGreaterThan(0);
+    expect(a.finalCapital).toBeCloseTo(11500 - a.rows[0].tax);
+  });
+
+  it('values the unrealized gain at the year-end rate in UAH, with no rate difference', () => {
+    const usd = analyzeReturns(
+      [{ year: 2025, files: [], deposits: 0, inflation: 0, accountGainUsd: 1000 }],
+      options,
+    );
+    const uah = analyzeReturns(
+      [{ year: 2025, files: [], deposits: 0, inflation: 0, accountGainUsd: 1000 }],
+      { ...options, currency: 'UAH', initialCapital: 400000 },
+    );
+    expect(usd.rows[0].unrealized).toBe(1000);
+    expect(uah.rows[0].unrealized).toBe(42000);
+    // 10 000 $ bought at 40 and valued at 42.
+    expect(uah.rows[0].fx).toBeCloseTo(20000);
+    expect(uah.finalCapital).toBeCloseTo(11000 * 42);
   });
 });
