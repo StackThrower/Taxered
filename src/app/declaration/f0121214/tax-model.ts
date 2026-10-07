@@ -75,7 +75,6 @@ export function calculateTaxes(
 ): TaxCalculations {
   let profitFromTrades = 0;
   let dividends = 0;
-  const rate = militaryTaxRate(year);
 
   for (const pos of positions) {
     const purchasePrice = Number.parseFloat(pos.purchasePrice) || 0;
@@ -89,6 +88,16 @@ export function calculateTaxes(
     }
   }
 
+  return taxesOnIncome(profitFromTrades, dividends, year);
+}
+
+/** Taxes on already aggregated UAH income: net trade profit and dividends received. */
+export function taxesOnIncome(
+  profitFromTrades: number,
+  dividends: number,
+  year: string,
+): TaxCalculations {
+  const rate = militaryTaxRate(year);
   const pdfoFromTrades = profitFromTrades > 0 ? profitFromTrades * 0.18 : 0;
   const militaryTaxFromTrades = profitFromTrades > 0 ? profitFromTrades * rate : 0;
   const pdfoFromDividends = dividends > 0 ? dividends * 0.09 : 0;

@@ -1,162 +1,420 @@
-<section id="calculator" class="px-4 py-16">
-  <div class="mx-auto max-w-4xl">
-    <div class="mb-12 text-center">
+<section id="calculator" class="px-4 py-12 md:py-16">
+  <!-- data-clarity-mask keeps financial data out of Microsoft Clarity recordings. -->
+  <div class="mx-auto max-w-5xl space-y-8" data-clarity-mask="true">
+    <div class="text-center">
       <h1 class="mb-4 flex items-center justify-center gap-3 text-3xl font-bold md:text-4xl">
-        <svg [appIcon]="icons.Calculator" class="size-8"></svg>
+        <svg [appIcon]="icons.LineChartIcon" class="size-8"></svg>
         {{ s.title }}
       </h1>
       <p class="mx-auto max-w-2xl text-lg text-muted-foreground">{{ s.subtitle }}</p>
     </div>
 
+    <!-- Settings -->
     <div class="card">
       <div class="card-header">
-        <h2 class="card-title">{{ s.inputTitle }}</h2>
-        <p class="card-description">{{ s.inputDescription }}</p>
+        <h2 class="card-title">{{ s.settingsTitle }}</h2>
+        <p class="card-description">{{ s.settingsDescription }}</p>
       </div>
-      <div class="card-content space-y-6">
+      <div class="card-content grid gap-6 md:grid-cols-2" [formGroup]="settings">
         <div class="space-y-2">
-          <label class="label" for="country">{{ s.selectCountry }}</label>
-          <select id="country" class="input" [formControl]="country">
-            @for (c of countries; track c.code) {
-              <option [value]="c.code">{{ c.flag }} {{ countryNames[c.code] }}</option>
-            }
+          <label class="label" for="currency">{{ s.currency }}</label>
+          <select id="currency" class="input" formControlName="currency">
+            <option value="USD">{{ s.currencyUsd }}</option>
+            <option value="UAH">{{ s.currencyUah }}</option>
           </select>
         </div>
-
         <div class="space-y-2">
-          <p class="label" id="income-type-label">{{ s.incomeType }}</p>
-          <div
-            #tablist
-            role="tablist"
-            aria-labelledby="income-type-label"
-            class="grid w-full grid-cols-2 gap-1 rounded-lg bg-muted p-1"
+          <label class="label" for="initialCapital"
+            >{{ s.initialCapital }} ({{ currency() }})</label
           >
-            @for (type of incomeTypes; track type) {
-              @let selected = incomeType() === type;
-              <button
-                type="button"
-                role="tab"
-                [id]="'income-tab-' + type"
-                [attr.aria-selected]="selected"
-                aria-controls="income-type-panel"
-                [attr.tabindex]="selected ? 0 : -1"
-                class="flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                [class]="
-                  selected
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                "
-                (click)="incomeType.set(type)"
-                (keydown)="onTabKeydown($event, tablist)"
-              >
-                <svg
-                  [appIcon]="type === 'salary' ? icons.Briefcase : icons.TrendingUp"
-                  class="size-4"
-                ></svg>
-                {{ type === 'salary' ? s.salary : s.investment }}
-              </button>
-            }
-          </div>
-          <div
-            id="income-type-panel"
-            role="tabpanel"
-            class="mt-4"
-            [attr.aria-labelledby]="'income-tab-' + incomeType()"
-          >
-            @if (incomeType() === 'salary') {
-              <div class="alert border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-                <svg [appIcon]="icons.Briefcase" class="size-4"></svg>
-                <p>{{ s.salaryDescription }}</p>
-              </div>
-            } @else {
-              <div
-                class="alert border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950"
-              >
-                <svg [appIcon]="icons.TrendingUp" class="size-4"></svg>
-                <p>{{ s.investmentDescription }}</p>
-              </div>
-            }
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <label class="label" for="income">{{ s.annualIncome }} ({{ currency() }})</label>
           <input
-            id="income"
+            id="initialCapital"
             type="number"
+            min="0"
             class="input"
-            placeholder="50000"
             inputmode="decimal"
-            [formControl]="income"
-            (keydown.enter)="calculate()"
+            placeholder="10000"
+            formControlName="initialCapital"
+            aria-describedby="initialCapital-hint"
           />
+          <p id="initialCapital-hint" class="text-sm text-muted-foreground">
+            {{ s.initialCapitalHint }}
+          </p>
         </div>
+        <label class="inline-flex cursor-pointer items-center gap-2 text-sm md:col-span-2">
+          <input type="checkbox" class="size-4 accent-primary" formControlName="includeTaxes" />
+          {{ s.includeTaxes }}
+        </label>
+      </div>
+    </div>
 
-        <div class="alert" role="note">
-          <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
-          <p>{{ s.disclaimer }}</p>
-        </div>
+    <!-- Reports by year -->
+    <div class="card">
+      <div class="card-header">
+        <h2 class="card-title">{{ s.reportsTitle }}</h2>
+        <p class="card-description">
+          {{ s.reportsDescription }}
+          <a [routerLink]="ibGuidePath" class="text-primary underline underline-offset-4">{{
+            s.ibGuide
+          }}</a>
+        </p>
+      </div>
+      <div class="card-content space-y-4">
+        <input
+          #fileInput
+          type="file"
+          accept=".xml,text/xml,application/xml"
+          multiple
+          class="hidden"
+          tabindex="-1"
+          aria-hidden="true"
+          (change)="importFiles($event)"
+        />
 
-        <div class="flex gap-3">
-          <button type="button" class="btn btn-primary flex-1" (click)="calculate()">
-            <svg [appIcon]="icons.Calculator" class="size-4"></svg>
-            {{ s.calculate }}
-          </button>
-          <button type="button" class="btn btn-outline" (click)="reset()">{{ s.reset }}</button>
-        </div>
-
-        <div aria-live="polite">
-          @if (result(); as r) {
-            <hr class="border-border" />
-            <div class="space-y-4 pt-4">
-              <h2 class="text-xl font-semibold">{{ s.results }}</h2>
-
-              <div class="grid gap-4">
-                <div class="flex items-center justify-between rounded-lg bg-muted p-4">
-                  <span class="font-medium">{{ s.grossIncome }}</span>
-                  <span class="text-xl font-bold">{{ currency() }} {{ format(r.income) }}</span>
-                </div>
-
-                @for (item of r.breakdown; track item.label) {
-                  <div class="flex items-center justify-between rounded-lg bg-muted/50 p-3">
-                    <span>
-                      {{ s.labels[item.label] }}
-                      @if (item.rate > 0) {
-                        ({{ item.rate }}%)
-                      }
-                    </span>
-                    <span class="font-semibold text-destructive"
-                      >-{{ currency() }} {{ format(item.value) }}</span
-                    >
-                  </div>
-                }
-
-                <hr class="border-border" />
-
-                <div class="flex items-center justify-between rounded-lg bg-primary/10 p-4">
-                  <span class="font-medium">{{ s.totalTax }}</span>
-                  <span class="text-xl font-bold text-destructive"
-                    >{{ currency() }} {{ format(r.totalTax) }}</span
-                  >
-                </div>
-
-                <div
-                  class="flex items-center justify-between rounded-lg border-2 border-primary bg-primary/10 p-4"
+        @for (group of years.controls; track group.controls.year.value; let i = $index) {
+          @let year = group.controls.year.value;
+          @let yearFiles = files()[year] ?? [];
+          @let busy = importStatus() !== null;
+          <section
+            class="space-y-4 rounded-lg border p-4"
+            [attr.aria-labelledby]="'year-title-' + year"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <h3 [id]="'year-title-' + year" class="text-lg font-semibold">{{ year }}</h3>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  class="btn btn-primary btn-sm"
+                  [disabled]="busy"
+                  [attr.aria-label]="s.uploadFor + ' ' + year"
+                  (click)="chooseFiles(year)"
                 >
-                  <span class="text-lg font-bold">{{ s.netIncome }}</span>
-                  <span class="text-2xl font-bold text-primary"
-                    >{{ currency() }} {{ format(r.netIncome) }}</span
-                  >
-                </div>
-
-                <p class="text-center text-sm text-muted-foreground">
-                  {{ s.taxRate }}: {{ r.effectiveRate }}%
-                </p>
+                  <svg [appIcon]="icons.Upload" class="size-4"></svg>
+                  {{ s.upload }}
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm btn-icon"
+                  [disabled]="busy"
+                  [attr.aria-label]="s.removeYear + ' ' + year"
+                  (click)="removeYear(i)"
+                >
+                  <svg [appIcon]="icons.Trash2" class="size-4"></svg>
+                </button>
               </div>
             </div>
+
+            @if (yearFiles.length === 0) {
+              <p class="text-sm text-muted-foreground">{{ s.noFiles }}</p>
+            } @else {
+              <ul class="space-y-2">
+                @for (file of yearFiles; track file.name) {
+                  <li class="rounded-md bg-muted/50 px-3 py-2 text-sm">
+                    <div class="flex items-center gap-2">
+                      <svg [appIcon]="icons.FileText" class="size-4 text-muted-foreground"></svg>
+                      <span class="badge">{{ sourceName(file) }}</span>
+                      <span class="min-w-0 flex-1 truncate">{{ file.name }}</span>
+                      <span class="hidden text-muted-foreground sm:inline">
+                        {{ file.trades }} {{ s.trades }}, {{ file.dividends }} {{ s.dividends }}
+                      </span>
+                      <span class="font-semibold tabular-nums">{{
+                        signedMoney()(fileIncome(file))
+                      }}</span>
+                      <button
+                        type="button"
+                        class="btn btn-ghost btn-sm size-8 px-0"
+                        [attr.aria-label]="s.removeFile + ' ' + file.name"
+                        (click)="removeFile(year, file.name)"
+                      >
+                        <svg [appIcon]="icons.X" class="size-4"></svg>
+                      </button>
+                    </div>
+                    @for (warning of file.warnings; track $index) {
+                      <p class="mt-1 text-muted-foreground">⚠️ {{ warning }}</p>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+
+            @for (error of errors()[year] ?? []; track $index) {
+              <p class="field-error" role="alert">{{ error }}</p>
+            }
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <label class="label" [for]="'deposits-' + year"
+                  >{{ s.deposits }} ({{ currency() }})</label
+                >
+                <input
+                  [id]="'deposits-' + year"
+                  type="number"
+                  class="input"
+                  inputmode="decimal"
+                  placeholder="0"
+                  [formControl]="group.controls.deposits"
+                  [attr.aria-describedby]="'deposits-hint-' + year"
+                />
+                <p [id]="'deposits-hint-' + year" class="text-sm text-muted-foreground">
+                  {{ s.depositsHint }}
+                </p>
+              </div>
+              <div class="space-y-2">
+                <label class="label" [for]="'inflation-' + year">{{ s.inflation }}</label>
+                <input
+                  [id]="'inflation-' + year"
+                  type="number"
+                  step="0.1"
+                  class="input"
+                  inputmode="decimal"
+                  [formControl]="group.controls.inflation"
+                  [attr.aria-describedby]="
+                    year === preliminaryYear ? 'inflation-hint-' + year : null
+                  "
+                />
+                @if (year === preliminaryYear) {
+                  <p [id]="'inflation-hint-' + year" class="text-sm text-muted-foreground">
+                    {{ s.inflationPreliminary }}
+                  </p>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
+        <div role="status" aria-live="polite" class="text-sm text-muted-foreground">
+          @if (importStatus(); as status) {
+            <span class="flex items-center gap-2">
+              <span
+                class="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                aria-hidden="true"
+              ></span>
+              {{ status.year }}: {{ status.text }}
+            </span>
+          }
+        </div>
+
+        @if (availableYears().length > 0) {
+          <div class="flex flex-wrap items-end gap-2">
+            <div class="space-y-2">
+              <label class="label" for="yearToAdd">{{ s.yearToAdd }}</label>
+              <select id="yearToAdd" class="input w-32" [formControl]="yearToAdd">
+                @for (y of availableYears(); track y) {
+                  <option [ngValue]="y">{{ y }}</option>
+                }
+              </select>
+            </div>
+            <button type="button" class="btn btn-outline" (click)="addYear()">
+              <svg [appIcon]="icons.Plus" class="size-4"></svg>
+              {{ s.addYear }}
+            </button>
+          </div>
+        }
+
+        <p class="text-sm text-muted-foreground">{{ s.privacy }}</p>
+      </div>
+    </div>
+
+    <!-- Results -->
+    @if (!hasData()) {
+      <div class="card">
+        <div class="card-content space-y-2 text-center">
+          <h2 class="text-lg font-semibold">{{ s.emptyTitle }}</h2>
+          <p class="text-sm text-muted-foreground">{{ s.emptyText }}</p>
+        </div>
+      </div>
+    } @else {
+      @let a = analysis();
+      @let uah = currency() === 'UAH';
+      <h2 class="text-2xl font-bold">{{ s.resultsTitle }}</h2>
+
+      <div
+        class="grid gap-4 sm:grid-cols-2"
+        [class]="uah && a.hasCapital ? 'lg:grid-cols-5' : 'lg:grid-cols-4'"
+      >
+        @if (a.hasCapital) {
+          <div class="card gap-1 border-primary px-6 sm:col-span-2 lg:col-span-1">
+            <p class="text-sm text-muted-foreground">{{ s.realGain }}</p>
+            <p class="text-3xl font-bold">{{ signedMoney()(a.realGain) }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ signedMoney()(a.realGainInStartPrices) }} {{ s.realGainHint }}
+              {{ a.rows[0].year }}
+            </p>
+          </div>
+          <div class="card gap-1 px-6">
+            <p class="text-sm text-muted-foreground">{{ s.avgReal }}</p>
+            <p class="text-2xl font-semibold">{{ percent(a.avgRealReturnPct) }}</p>
+            <p class="text-sm text-muted-foreground">{{ s.perYear }}</p>
+          </div>
+        }
+        <div class="card gap-1 px-6">
+          <p class="text-sm text-muted-foreground">{{ s.totalNet }}</p>
+          <p class="text-2xl font-semibold">{{ signedMoney()(a.net) }}</p>
+        </div>
+        @if (uah) {
+          <div class="card gap-1 px-6">
+            <p class="text-sm text-muted-foreground">{{ s.fxTotal }}</p>
+            <p class="text-2xl font-semibold">{{ signedMoney()(a.fx) }}</p>
+            <p class="text-sm text-muted-foreground">{{ s.fxHint }}</p>
+          </div>
+        }
+        <div class="card gap-1 px-6">
+          <p class="text-sm text-muted-foreground">{{ s.totalTax }}</p>
+          <p class="text-2xl font-semibold">{{ money()(a.tax) }}</p>
+          @if (a.taxOnFx > 0.5) {
+            <p class="text-sm text-muted-foreground">{{ s.taxOnFx }}: {{ money()(a.taxOnFx) }}</p>
           }
         </div>
       </div>
+
+      @if (!a.hasCapital) {
+        <div class="alert" role="note">
+          <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
+          <p>{{ s.needCapital }}</p>
+        </div>
+      }
+
+      @let rc = returnsChart();
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{{ s.returnsChartTitle }}</h3>
+          <p class="card-description">
+            {{ rc.hasCapital ? s.returnsChartPercent : s.returnsChartAmount }}
+          </p>
+        </div>
+        <div class="card-content">
+          <app-bar-chart
+            [categories]="rc.categories"
+            [series]="rc.series"
+            [label]="s.returnsChartTitle"
+            [format]="rc.hasCapital ? percent : signedMoney()"
+            [axisFormat]="rc.hasCapital ? axisPercent : compactMoney()"
+          />
+        </div>
+      </div>
+
+      @if (a.hasCapital) {
+        @let cc = capitalChart();
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">{{ s.capitalChartTitle }}</h3>
+            <p class="card-description">{{ s.capitalChartDescription }}</p>
+          </div>
+          <div class="card-content">
+            <app-line-chart
+              [labels]="cc.labels"
+              [series]="cc.series"
+              [label]="s.capitalChartTitle"
+              [format]="money()"
+              [axisFormat]="compactMoney()"
+              [detail]="cc.detail"
+              [fillBetween]="true"
+            />
+          </div>
+        </div>
+      }
+
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">{{ s.tableTitle }}</h3>
+        </div>
+        <div class="card-content">
+          <div
+            class="overflow-x-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+            tabindex="0"
+            role="region"
+            [attr.aria-label]="s.tableTitle"
+          >
+            <table class="w-full text-sm tabular-nums">
+              <thead>
+                <tr class="border-b text-left text-muted-foreground">
+                  <th scope="col" class="py-2 pr-4 font-medium">{{ s.year }}</th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colTrades }}</th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    {{ s.colDividends }}
+                  </th>
+                  @if (uah) {
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colFx }}</th>
+                  }
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colTax }}</th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colNet }}</th>
+                  @if (a.hasCapital) {
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">
+                      {{ s.colStart }}
+                    </th>
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">
+                      {{ s.colReturn }}
+                    </th>
+                  }
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    {{ s.colInflation }}
+                  </th>
+                  @if (a.hasCapital) {
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colReal }}</th>
+                    <th scope="col" class="py-2 text-right font-medium">{{ s.colAbove }}</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of a.rows; track r.year) {
+                  <tr class="border-b">
+                    <th scope="row" class="py-2 pr-4 text-left font-medium">
+                      {{ r.year }}
+                      @if (r.missing) {
+                        <span class="block text-xs font-normal text-muted-foreground">{{
+                          s.missingYear
+                        }}</span>
+                      }
+                    </th>
+                    <td class="py-2 pr-4 text-right">{{ money()(r.trades) }}</td>
+                    <td class="py-2 pr-4 text-right">{{ money()(r.dividends) }}</td>
+                    @if (uah) {
+                      <td class="py-2 pr-4 text-right">{{ signedMoney()(r.fx) }}</td>
+                    }
+                    <td class="py-2 pr-4 text-right">{{ money()(r.tax) }}</td>
+                    <td class="py-2 pr-4 text-right font-semibold">{{ money()(r.net) }}</td>
+                    @if (a.hasCapital) {
+                      <td class="py-2 pr-4 text-right">
+                        {{ money()(r.startCapital + r.deposits) }}
+                      </td>
+                      <td class="py-2 pr-4 text-right">{{ percent(r.returnPct) }}</td>
+                    }
+                    <td class="py-2 pr-4 text-right">{{ percent(r.inflation) }}</td>
+                    @if (a.hasCapital) {
+                      <td class="py-2 pr-4 text-right font-semibold">
+                        {{ percent(r.realReturnPct) }}
+                      </td>
+                      <td class="py-2 text-right">{{ signedMoney()(r.aboveInflation) }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="font-semibold">
+                  <th scope="row" class="py-2 pr-4 text-left">{{ s.total }}</th>
+                  <td class="py-2 pr-4 text-right" colspan="2">{{ money()(a.gross) }}</td>
+                  @if (uah) {
+                    <td class="py-2 pr-4 text-right">{{ signedMoney()(a.fx) }}</td>
+                  }
+                  <td class="py-2 pr-4 text-right">{{ money()(a.tax) }}</td>
+                  <td class="py-2 pr-4 text-right">{{ money()(a.net) }}</td>
+                  @if (a.hasCapital) {
+                    <td class="py-2 pr-4" colspan="4"></td>
+                    <td class="py-2 text-right">{{ signedMoney()(a.realGain) }}</td>
+                  } @else {
+                    <td class="py-2"></td>
+                  }
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    }
+
+    <div class="alert" role="note">
+      <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
+      <p>{{ s.disclaimer }}</p>
     </div>
   </div>
 </section>

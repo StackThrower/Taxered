@@ -29,14 +29,32 @@ export const SUPPORTED_CURRENCIES = [
  * @param currencyCode - ISO 4217 currency code (e.g., USD, EUR)
  * @returns Exchange rate or null if not found
  */
-export async function fetchNBUExchangeRate(
-  date: string,
-  currencyCode: string,
-): Promise<number | null> {
+export function fetchNBUExchangeRate(date: string, currencyCode: string): Promise<number | null> {
   if (!date || !currencyCode || currencyCode === 'UAH') {
-    return 1; // UAH to UAH rate is 1
+    return Promise.resolve(1); // UAH to UAH rate is 1
   }
 
+  // Imports request the same date+currency many times; failed lookups are not cached.
+  const key = `${currencyCode}:${date}`;
+  let rate = rateCache.get(key);
+  if (!rate) {
+    rate = requestNBUExchangeRate(date, currencyCode);
+    rateCache.set(key, rate);
+    rate.then((value) => value === null && rateCache.delete(key));
+  }
+  return rate;
+}
+
+/** NBU UAH per USD at the end of `year`, or today's rate for a year that has not ended. */
+export function fetchYearEndUSDRate(year: number): Promise<number | null> {
+  const today = new Date().toISOString().slice(0, 10);
+  const yearEnd = `${year}-12-31`;
+  return fetchNBUExchangeRate(yearEnd < today ? yearEnd : today, 'USD');
+}
+
+const rateCache = new Map<string, Promise<number | null>>();
+
+async function requestNBUExchangeRate(date: string, currencyCode: string): Promise<number | null> {
   try {
     // Format date as YYYYMMDD for NBU API
     const formattedDate = date.replace(/-/g, '');

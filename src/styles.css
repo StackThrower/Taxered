@@ -29,6 +29,12 @@
   --control-border: oklch(0.6 0.03 142);
   --ring: oklch(0.45 0.15 142);
   --radius: 0.625rem;
+  /* Chart series (validated for colour-blind separation against the card surface). */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-grid: oklch(0.93 0.01 142);
+  --chart-axis: oklch(0.75 0.02 142);
   color-scheme: light;
 }
 
@@ -50,6 +56,11 @@
   --border: oklch(0.3 0.08 142);
   --control-border: oklch(0.55 0.05 142);
   --ring: oklch(0.65 0.17 142);
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-grid: oklch(0.3 0.04 142);
+  --chart-axis: oklch(0.45 0.05 142);
   color-scheme: dark;
 }
 
