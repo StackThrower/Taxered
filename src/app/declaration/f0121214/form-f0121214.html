@@ -260,7 +260,7 @@
                   </p>
                 </div>
               } @else {
-                <div class="grid gap-4 md:grid-cols-2">
+                <div class="grid gap-4 md:grid-cols-3">
                   <div class="space-y-2">
                     <p class="label">Курс НБУ купівлі</p>
                     <p class="rounded-md bg-muted p-3 font-mono text-sm">
@@ -273,7 +273,17 @@
                       {{ formatRate(position.saleRate, position.currency) }} ₴
                     </p>
                   </div>
+                  <div class="space-y-2">
+                    <p class="label">Курсова різниця</p>
+                    <p class="rounded-md bg-muted p-3 font-mono text-sm">
+                      {{ signed(fxDifference(position)) }} ₴
+                    </p>
+                  </div>
                 </div>
+                <p class="mt-2 text-xs text-muted-foreground">
+                  Сума купівлі × (курс продажу − курс купівлі). Входить у прибуток у гривні й
+                  оподатковується разом із ним.
+                </p>
               }
             </div>
           }
@@ -543,6 +553,20 @@
                 </p>
               </div>
             </div>
+            @if (calc.fxDifference !== 0) {
+              <div class="grid gap-3 pl-4 md:grid-cols-3">
+                <div class="space-y-1 rounded-md border border-border bg-background p-3">
+                  <p class="text-xs text-muted-foreground">З них курсова різниця</p>
+                  <p class="text-lg font-bold">{{ signed(calc.fxDifference) }} ₴</p>
+                </div>
+                <div class="space-y-1 rounded-md border border-border bg-background p-3">
+                  <p class="text-xs text-muted-foreground">
+                    Податки з курсової різниці (18% + {{ militaryRate() }}%)
+                  </p>
+                  <p class="text-lg font-bold">{{ signed(calc.taxOnFx) }} ₴</p>
+                </div>
+              </div>
+            }
           </div>
         }
 

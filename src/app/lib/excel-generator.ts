@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import { positionFxDifference } from '../declaration/f0121214/tax-model';
 
 interface FinancialPosition {
   id: string;
@@ -30,6 +31,8 @@ interface Calculations {
   pdfoFromDividends: number;
   militaryTaxFromTrades: number;
   militaryTaxFromDividends: number;
+  fxDifference: number;
+  taxOnFx: number;
 }
 
 interface FormData {
@@ -94,6 +97,15 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
         t.uah,
         t.rate5,
       ]);
+      if (formData.calculations.fxDifference !== 0) {
+        summaryData.push([
+          t.fxDifference,
+          formData.calculations.fxDifference.toFixed(2),
+          t.uah,
+          t.includedInProfit,
+        ]);
+        summaryData.push([t.taxOnFx, formData.calculations.taxOnFx.toFixed(2), t.uah, '']);
+      }
       summaryData.push(['', '', '', '']);
     }
 
@@ -142,6 +154,7 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
       t.saleAmountForeign,
       t.saleRate,
       t.saleAmountUAH,
+      t.fxDifferenceColumn,
       t.expenses,
       t.profitLoss,
       t.taxRate,
@@ -198,6 +211,7 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
       pos.salePriceForeign || '-',
       pos.saleRate || '1',
       salePrice.toFixed(2),
+      positionFxDifference(pos).toFixed(2),
       expenses.toFixed(2),
       profit.toFixed(2),
       taxRateLabel,
@@ -226,6 +240,7 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
     { wch: 15 }, // Sale Amount Foreign
     { wch: 12 }, // Sale Rate
     { wch: 15 }, // Sale Amount UAH
+    { wch: 15 }, // Exchange-rate difference
     { wch: 12 }, // Expenses
     { wch: 15 }, // Profit/Loss
     { wch: 12 }, // Tax Rate
@@ -250,6 +265,7 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
     [t.tradesCalculation],
     [t.step1, t.calculateProfit],
     ['', t.profitFormula],
+    ['', t.fxFormula],
     [t.step2, t.calculatePdfo],
     ['', t.pdfoTradesFormula],
     [t.step3, t.calculateMilitary],
@@ -542,6 +558,11 @@ function getTranslations(militaryTaxPercent: string = '5') {
       saleRate: 'Курс продажу',
       saleAmountUAH: 'Продаж (грн)',
       expenses: 'Витрати',
+      fxDifferenceColumn: 'Курсова різниця (грн)',
+      fxDifference: 'З них курсова різниця',
+      includedInProfit: '(входить у прибуток)',
+      taxOnFx: 'Податки з курсової різниці',
+      fxFormula: 'Курсова різниця = Купівля (валюта) × (Курс продажу − Курс купівлі)',
       profitLoss: 'Прибуток/Збиток',
       taxRate: 'Ставка податку',
       noTax: 'Немає податку (збиток)',

@@ -30,6 +30,7 @@ import {
   REPORT_YEARS,
   calculateTaxes,
   militaryTaxRateLabel,
+  positionFxDifference,
 } from './tax-model';
 
 const ANONYMOUS_VALUE = 'Не вказано';
@@ -90,6 +91,7 @@ export class FormF0121214 {
   protected readonly currencies = SUPPORTED_CURRENCIES;
   protected readonly ibGuidePath = localePath('knowledge', 'flex-report-ib');
   protected readonly getCurrencySymbol = getCurrencySymbol;
+  protected readonly fxDifference = positionFxDifference;
 
   private idCounter = 0;
   /** Latest NBU request per position+side, so a slow stale response cannot overwrite a newer one. */
@@ -159,6 +161,11 @@ export class FormF0121214 {
 
   protected abs(value: number): number {
     return Math.abs(value);
+  }
+
+  /** Amount with an explicit sign, e.g. "+1200.00" or "-35.50". */
+  protected signed(value: number): string {
+    return (value > 0 ? '+' : value < 0 ? '-' : '') + Math.abs(value).toFixed(2);
   }
 
   protected quantity(value: string | undefined): number {

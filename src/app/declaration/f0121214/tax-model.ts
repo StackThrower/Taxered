@@ -49,7 +49,19 @@ export interface TaxCalculations {
   pdfoFromDividends: number;
   militaryTaxFromTrades: number;
   militaryTaxFromDividends: number;
+  /** Exchange-rate part of the trade profit, already included in `profitFromTrades`. */
+  fxDifference: number;
+  /** PDFO and military levy that the exchange-rate difference adds (negative if it lowers them). */
+  taxOnFx: number;
 }
+
+type TaxablePosition = Pick<
+  FinancialPosition,
+  'assetType' | 'purchasePrice' | 'salePrice' | 'expenses'
+> &
+  Partial<
+    Pick<FinancialPosition, 'currency' | 'purchasePriceForeign' | 'purchaseRate' | 'saleRate'>
+  >;
 
 /** Military levy: 1.5% for report years up to 2024, 5% from 2025. */
 export function militaryTaxRate(year: string): number {
@@ -67,14 +79,12 @@ export function militaryTaxRateLabel(year: string): string {
  * Dividends: reduced 9% PDFO + military levy on the amount received.
  */
 export function calculateTaxes(
-  positions: readonly Pick<
-    FinancialPosition,
-    'assetType' | 'purchasePrice' | 'salePrice' | 'expenses'
-  >[],
+  positions: readonly TaxablePosition[],
   year: string,
 ): TaxCalculations {
   let profitFromTrades = 0;
   let dividends = 0;
+  let fxDifference = 0;
 
   for (const pos of positions) {
     const purchasePrice = Number.parseFloat(pos.purchasePrice) || 0;
@@ -85,19 +95,40 @@ export function calculateTaxes(
       dividends += salePrice;
     } else {
       profitFromTrades += salePrice - purchasePrice - expenses;
+      fxDifference += positionFxDifference(pos);
     }
   }
 
-  return taxesOnIncome(profitFromTrades, dividends, year);
+  return taxesOnIncome(profitFromTrades, dividends, year, fxDifference);
 }
 
-/** Taxes on already aggregated UAH income: net trade profit and dividends received. */
+/**
+ * Exchange-rate difference of a foreign-currency trade: the purchase cost revalued from the
+ * purchase-date to the sale-date NBU rate. It is the part of the UAH profit that comes from the
+ * hryvnia rate alone, so it is taxed even when the trade broke even in the currency.
+ */
+export function positionFxDifference(pos: TaxablePosition): number {
+  if (pos.assetType === 'dividends' || !pos.currency || pos.currency === 'UAH') {
+    return 0;
+  }
+  const purchase = Number.parseFloat(pos.purchasePriceForeign ?? '') || 0;
+  const purchaseRate = Number.parseFloat(pos.purchaseRate ?? '') || 0;
+  const saleRate = Number.parseFloat(pos.saleRate ?? '') || 0;
+  return purchaseRate && saleRate ? purchase * (saleRate - purchaseRate) : 0;
+}
+
+/**
+ * Taxes on already aggregated UAH income: net trade profit and dividends received.
+ * `fxDifference` is the exchange-rate part of `profitFromTrades`, used to report the tax it adds.
+ */
 export function taxesOnIncome(
   profitFromTrades: number,
   dividends: number,
   year: string,
+  fxDifference = 0,
 ): TaxCalculations {
   const rate = militaryTaxRate(year);
+  const withoutFx = Math.max(0, profitFromTrades - fxDifference);
   const pdfoFromTrades = profitFromTrades > 0 ? profitFromTrades * 0.18 : 0;
   const militaryTaxFromTrades = profitFromTrades > 0 ? profitFromTrades * rate : 0;
   const pdfoFromDividends = dividends > 0 ? dividends * 0.09 : 0;
@@ -117,5 +148,7 @@ export function taxesOnIncome(
     pdfoFromDividends,
     militaryTaxFromTrades,
     militaryTaxFromDividends,
+    fxDifference,
+    taxOnFx: pdfoFromTrades + militaryTaxFromTrades - withoutFx * (0.18 + rate),
   };
 }
