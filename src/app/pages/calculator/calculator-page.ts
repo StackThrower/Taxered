@@ -64,6 +64,7 @@ export class CalculatorPage {
   protected readonly settings = new FormGroup({
     currency: control<DisplayCurrency>('USD'),
     includeTaxes: control(true),
+    taxesPaidSeparately: control(false),
   });
   protected readonly years = new FormArray<YearGroup>([]);
   protected readonly yearToAdd = control(CURRENT_YEAR - 1);
@@ -82,7 +83,7 @@ export class CalculatorPage {
 
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
 
-  private readonly settingsValue = toSignal(
+  protected readonly settingsValue = toSignal(
     this.settings.valueChanges.pipe(map(() => this.settings.getRawValue())),
     { initialValue: this.settings.getRawValue() },
   );
@@ -138,7 +139,7 @@ export class CalculatorPage {
 
   protected readonly analysis = computed(() => {
     const files = this.files();
-    const { currency, includeTaxes } = this.settingsValue();
+    const { currency, includeTaxes, taxesPaidSeparately } = this.settingsValue();
     const statementDeposits = this.statementDeposits();
     const statementYears = this.statementYears();
     const years: YearInput[] = this.yearsValue().map((y) => ({
@@ -153,6 +154,7 @@ export class CalculatorPage {
       currency,
       initialCapital: Math.max(0, this.startCapital()?.value ?? 0),
       includeTaxes,
+      taxesPaidSeparately,
       usdRates: this.usdRates(),
     });
   });

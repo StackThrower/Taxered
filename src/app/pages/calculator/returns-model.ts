@@ -53,6 +53,12 @@ export interface AnalysisOptions {
   currency: DisplayCurrency;
   initialCapital: number;
   includeTaxes: boolean;
+  /**
+   * Taxes are paid from other money, not from the broker account: the capital stays at the
+   * account value and the taxes count as money invested, so they raise the inflation
+   * threshold instead.
+   */
+  taxesPaidSeparately?: boolean;
   /** NBU UAH per USD at the end of each year; `null` or absent while unknown. */
   usdRates: Readonly<Record<number, number | null>>;
 }
@@ -198,8 +204,9 @@ export function analyzeReturns(years: readonly YearInput[], options: AnalysisOpt
     const thresholdBase = threshold + input.deposits;
     const returnPct = base > 0 ? (net / base) * 100 : null;
 
-    capital = base + net;
-    threshold = thresholdBase * (1 + inflation);
+    const taxFromOutside = options.taxesPaidSeparately ? tax : 0;
+    capital = base + net + taxFromOutside;
+    threshold = thresholdBase * (1 + inflation) + taxFromOutside;
     priceLevel *= 1 + inflation;
 
     rows.push({

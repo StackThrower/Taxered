@@ -265,6 +265,30 @@ describe('account value from statements', () => {
     expect(a.finalCapital).toBeCloseTo(11500 - a.rows[0].tax);
   });
 
+  it('keeps the account value when taxes are paid from other money', () => {
+    const years: YearInput[] = [
+      {
+        year: 2025,
+        files: [report(300, 100, 40)],
+        deposits: 0,
+        inflation: 5,
+        accountGainUsd: 1500,
+      },
+    ];
+    const fromAccount = analyzeReturns(years, { ...options, includeTaxes: true });
+    const separately = analyzeReturns(years, {
+      ...options,
+      includeTaxes: true,
+      taxesPaidSeparately: true,
+    });
+    const tax = separately.rows[0].tax;
+    expect(tax).toBeGreaterThan(0);
+    expect(separately.finalCapital).toBeCloseTo(11500);
+    expect(separately.finalThreshold).toBeCloseTo(10500 + tax);
+    expect(separately.net).toBeCloseTo(fromAccount.net);
+    expect(separately.realGain).toBeCloseTo(fromAccount.realGain);
+  });
+
   it('values the unrealized gain at the year-end rate in UAH, with no rate difference', () => {
     const usd = analyzeReturns(
       [{ year: 2025, files: [], deposits: 0, inflation: 0, accountGainUsd: 1000 }],

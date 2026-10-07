@@ -38,6 +38,22 @@
           <input type="checkbox" class="size-4 accent-primary" formControlName="includeTaxes" />
           {{ s.includeTaxes }}
         </label>
+        @if (settingsValue().includeTaxes) {
+          <div class="space-y-1 md:col-span-2">
+            <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                class="size-4 accent-primary"
+                formControlName="taxesPaidSeparately"
+                aria-describedby="taxesPaidSeparately-hint"
+              />
+              {{ s.taxesPaidSeparately }}
+            </label>
+            <p id="taxesPaidSeparately-hint" class="text-sm text-muted-foreground">
+              {{ s.taxesPaidSeparatelyHint }}
+            </p>
+          </div>
+        }
       </div>
     </div>
 
