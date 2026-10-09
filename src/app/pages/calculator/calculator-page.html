@@ -259,7 +259,9 @@
       >
         @if (a.hasCapital) {
           <div class="card gap-1 border-primary px-6 sm:col-span-2 lg:col-span-1">
-            <p class="text-sm text-muted-foreground">{{ s.realGain }}</p>
+            <p class="flex items-center gap-1 text-sm text-muted-foreground">
+              {{ s.realGain }} <app-info-hint [label]="s.realGain" [text]="h.realGain" />
+            </p>
             <p class="text-3xl font-bold">{{ signedMoney()(a.realGain) }}</p>
             <p class="text-sm text-muted-foreground">
               {{ signedMoney()(a.realGainInStartPrices) }} {{ s.realGainHint }}
@@ -267,13 +269,18 @@
             </p>
           </div>
           <div class="card gap-1 px-6">
-            <p class="text-sm text-muted-foreground">{{ s.avgReal }}</p>
+            <p class="flex items-center gap-1 text-sm text-muted-foreground">
+              {{ s.avgReal }} <app-info-hint [label]="s.avgReal" [text]="h.avgReal" />
+            </p>
             <p class="text-2xl font-semibold">{{ percent(a.avgRealReturnPct) }}</p>
             <p class="text-sm text-muted-foreground">{{ s.perYear }}</p>
           </div>
         }
         <div class="card gap-1 px-6">
-          <p class="text-sm text-muted-foreground">{{ s.totalNet }}</p>
+          <p class="flex items-center gap-1 text-sm text-muted-foreground">
+            {{ s.totalNet }}
+            <app-info-hint [label]="s.totalNet" [text]="uah ? h.totalNetUah : h.totalNetUsd" />
+          </p>
           <p class="text-2xl font-semibold">{{ signedMoney()(a.net) }}</p>
           @if (a.unrealized !== 0) {
             <p class="text-sm text-muted-foreground">
@@ -283,13 +290,17 @@
         </div>
         @if (uah) {
           <div class="card gap-1 px-6">
-            <p class="text-sm text-muted-foreground">{{ s.fxTotal }}</p>
+            <p class="flex items-center gap-1 text-sm text-muted-foreground">
+              {{ s.fxTotal }} <app-info-hint [label]="s.fxTotal" [text]="h.fxTotal" />
+            </p>
             <p class="text-2xl font-semibold">{{ signedMoney()(a.fx) }}</p>
             <p class="text-sm text-muted-foreground">{{ s.fxHint }}</p>
           </div>
         }
         <div class="card gap-1 px-6">
-          <p class="text-sm text-muted-foreground">{{ s.totalTax }}</p>
+          <p class="flex items-center gap-1 text-sm text-muted-foreground">
+            {{ s.totalTax }} <app-info-hint [label]="s.totalTax" [text]="h.totalTax" />
+          </p>
           <p class="text-2xl font-semibold">{{ money()(a.tax) }}</p>
           @if (a.taxOnFx > 0.5) {
             <p class="text-sm text-muted-foreground">{{ s.taxOnFx }}: {{ money()(a.taxOnFx) }}</p>
@@ -358,33 +369,86 @@
             <table class="w-full text-sm tabular-nums">
               <thead>
                 <tr class="border-b text-left text-muted-foreground">
-                  <th scope="col" class="py-2 pr-4 font-medium">{{ s.year }}</th>
-                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colTrades }}</th>
-                  <th scope="col" class="py-2 pr-4 text-right font-medium">
-                    {{ s.colDividends }}
+                  <th scope="col" class="py-2 pr-4 font-medium">
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.year }} <app-info-hint [label]="s.year" [text]="h.year" />
+                    </div>
                   </th>
                   <th scope="col" class="py-2 pr-4 text-right font-medium">
-                    {{ s.colUnrealized }}
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colTrades }}
+                      <app-info-hint
+                        [label]="s.colTrades"
+                        [text]="uah ? h.tradesUah : h.tradesUsd"
+                      />
+                    </div>
+                  </th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colDividends }}
+                      <app-info-hint
+                        [label]="s.colDividends"
+                        [text]="uah ? h.dividendsUah : h.dividendsUsd"
+                      />
+                    </div>
+                  </th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colUnrealized }}
+                      <app-info-hint
+                        [label]="s.colUnrealized"
+                        [text]="uah ? h.unrealizedUah : h.unrealizedUsd"
+                      />
+                    </div>
                   </th>
                   @if (uah) {
-                    <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colFx }}</th>
-                  }
-                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colTax }}</th>
-                  <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colNet }}</th>
-                  @if (a.hasCapital) {
                     <th scope="col" class="py-2 pr-4 text-right font-medium">
-                      {{ s.colStart }}
-                    </th>
-                    <th scope="col" class="py-2 pr-4 text-right font-medium">
-                      {{ s.colReturn }}
+                      <div class="inline-flex items-center gap-1">
+                        {{ s.colFx }} <app-info-hint [label]="s.colFx" [text]="h.fx" />
+                      </div>
                     </th>
                   }
                   <th scope="col" class="py-2 pr-4 text-right font-medium">
-                    {{ s.colInflation }}
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colTax }}
+                      <app-info-hint [label]="s.colTax" [text]="uah ? h.taxUah : h.taxUsd" />
+                    </div>
+                  </th>
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colNet }}
+                      <app-info-hint [label]="s.colNet" [text]="uah ? h.netUah : h.netUsd" />
+                    </div>
                   </th>
                   @if (a.hasCapital) {
-                    <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.colReal }}</th>
-                    <th scope="col" class="py-2 text-right font-medium">{{ s.colAbove }}</th>
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">
+                      <div class="inline-flex items-center gap-1">
+                        {{ s.colStart }} <app-info-hint [label]="s.colStart" [text]="h.start" />
+                      </div>
+                    </th>
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">
+                      <div class="inline-flex items-center gap-1">
+                        {{ s.colReturn }} <app-info-hint [label]="s.colReturn" [text]="h.return" />
+                      </div>
+                    </th>
+                  }
+                  <th scope="col" class="py-2 pr-4 text-right font-medium">
+                    <div class="inline-flex items-center gap-1">
+                      {{ s.colInflation }}
+                      <app-info-hint [label]="s.colInflation" [text]="h.inflation" />
+                    </div>
+                  </th>
+                  @if (a.hasCapital) {
+                    <th scope="col" class="py-2 pr-4 text-right font-medium">
+                      <div class="inline-flex items-center gap-1">
+                        {{ s.colReal }} <app-info-hint [label]="s.colReal" [text]="h.real" />
+                      </div>
+                    </th>
+                    <th scope="col" class="py-2 text-right font-medium">
+                      <div class="inline-flex items-center gap-1">
+                        {{ s.colAbove }} <app-info-hint [label]="s.colAbove" [text]="h.above" />
+                      </div>
+                    </th>
                   }
                 </tr>
               </thead>

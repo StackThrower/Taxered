@@ -25,6 +25,7 @@ import {
 } from '../../lib/inflation';
 import { fetchYearEndUSDRate } from '../../lib/nbu-exchange-rates';
 import { Icon } from '../../shared/icon';
+import { InfoHint } from '../../shared/info-hint';
 import { BarChart } from './bar-chart';
 import type { BrokerReport } from './broker-import';
 import { ChartSeries } from './chart-utils';
@@ -52,12 +53,13 @@ function control<T>(value: T): FormControl<T> {
 
 @Component({
   selector: 'app-calculator-page',
-  imports: [ReactiveFormsModule, Icon, BarChart, LineChart],
+  imports: [ReactiveFormsModule, Icon, InfoHint, BarChart, LineChart],
   templateUrl: './calculator-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CalculatorPage {
   protected readonly s = UK.calculator;
+  protected readonly h = UK.calculator.hints;
   protected readonly icons = { AlertCircle, FileText, LineChartIcon, Plus, Trash2, Upload, X };
   protected readonly preliminaryYear = PRELIMINARY_INFLATION_YEAR;
 
