@@ -9,7 +9,7 @@ export const UK = {
     forms: 'Форми',
     calculator: 'Калькулятор',
     help: 'Допомога',
-    orderWebsite: 'Замовити розробку вебсайту',
+    orderWebsite: 'Розробник вебсайту',
     openMenu: 'Відкрити меню',
     closeMenu: 'Закрити меню',
     mainNav: 'Основна навігація',
