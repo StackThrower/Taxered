@@ -4,6 +4,7 @@ const STATIC_PAGES = [
   '',
   'uk-ua',
   'uk-ua/calculator',
+  'uk-ua/tax-map',
   'uk-ua/about',
   'uk-ua/help',
   'uk-ua/privacy',

@@ -29,6 +29,9 @@
       <a [routerLink]="calculatorPath" class="whitespace-nowrap underline-offset-4 hover:underline">
         {{ s.calculator }}
       </a>
+      <a [routerLink]="taxMapPath" class="whitespace-nowrap underline-offset-4 hover:underline">
+        {{ taxMapLabel }}
+      </a>
       <a [routerLink]="helpPath" class="whitespace-nowrap underline-offset-4 hover:underline">
         {{ s.help }}
       </a>
@@ -105,6 +108,16 @@
           <svg [appIcon]="icons.Calculator" class="size-4 text-accent"></svg>
         </span>
         <span class="flex-1">{{ s.calculator }}</span>
+      </a>
+      <a
+        [routerLink]="taxMapPath"
+        class="group flex items-center gap-4 rounded-lg px-4 py-3.5 text-base font-medium transition-colors hover:bg-muted"
+        (click)="closeMenu()"
+      >
+        <span class="flex size-9 items-center justify-center rounded-lg bg-primary/10">
+          <svg [appIcon]="icons.Globe" class="size-4 text-primary"></svg>
+        </span>
+        <span class="flex-1">{{ taxMapLabel }}</span>
       </a>
       <a
         [routerLink]="helpPath"

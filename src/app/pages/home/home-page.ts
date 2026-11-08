@@ -2,10 +2,13 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ArrowRight, Globe } from 'lucide';
 import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
 import { LOCALE, SITE_URL, localePath } from '../../core/site';
 import { FormsSection } from '../../declaration/forms-section';
+import { Icon } from '../../shared/icon';
+import { COUNTRIES, RATE_BINS } from '../tax-map/tax-data';
 
 const VIDEO_ID = 'lEdebx3hXeU';
 
@@ -25,7 +28,7 @@ const KEYWORDS = [
 
 @Component({
   selector: 'app-home-page',
-  imports: [RouterLink, FormsSection],
+  imports: [RouterLink, FormsSection, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <section class="bg-gradient-to-b from-primary/10 to-background px-4 py-12 md:py-16 lg:py-20">
@@ -50,6 +53,33 @@ const KEYWORDS = [
             s.learn
           }}</a>
         </div>
+      </div>
+    </section>
+
+    <section class="mx-auto max-w-4xl px-4 pt-12 md:pt-16" aria-labelledby="tax-map-title">
+      <div
+        class="card relative flex-col items-start gap-5 px-6 transition-colors hover:border-primary/50 md:flex-row md:items-center"
+      >
+        <span class="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+          <svg [appIcon]="icons.Globe" class="size-6 text-primary"></svg>
+        </span>
+        <div class="min-w-0 flex-1 space-y-2">
+          <h2 id="tax-map-title" class="text-xl font-bold md:text-2xl">{{ m.homeTitle }}</h2>
+          <p class="text-sm text-foreground/70 md:text-base">{{ taxMapDescription }}</p>
+          <div class="flex gap-1 pt-1" aria-hidden="true">
+            @for (bin of bins; track bin.label) {
+              <span class="h-1.5 w-8 rounded-full" [style.background]="bin.bg"></span>
+            }
+          </div>
+        </div>
+        <!-- The whole card is clickable through the stretched link. -->
+        <a
+          [routerLink]="taxMapPath"
+          class="btn btn-primary btn-lg w-full after:absolute after:inset-0 after:rounded-xl md:w-auto"
+        >
+          {{ m.homeCta }}
+          <svg [appIcon]="icons.ArrowRight" class="size-4"></svg>
+        </a>
       </div>
     </section>
 
@@ -89,6 +119,14 @@ export class HomePage {
     `https://www.youtube-nocookie.com/embed/${VIDEO_ID}`,
   );
   protected readonly aboutPath = localePath('about');
+  protected readonly taxMapPath = localePath('tax-map');
+  protected readonly m = UK.taxMap;
+  protected readonly taxMapDescription = UK.taxMap.homeDescription.replace(
+    '{count}',
+    String(COUNTRIES.length),
+  );
+  protected readonly bins = RATE_BINS;
+  protected readonly icons = { ArrowRight, Globe };
 
   constructor() {
     // The site root (`/`) and `/uk-ua` render the same page with different metadata.

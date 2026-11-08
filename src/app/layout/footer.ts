@@ -16,6 +16,7 @@ export class Footer {
   protected readonly helpTitle = UK.help.title;
   protected readonly calculatorTitle = UK.calculator.title;
   protected readonly knowledgeTitle = UK.knowledge.base;
+  protected readonly taxMapTitle = UK.taxMap.nav;
   protected readonly paths = {
     home: localePath(),
     about: localePath('about'),
@@ -23,6 +24,7 @@ export class Footer {
     terms: localePath('terms'),
     help: localePath('help'),
     calculator: localePath('calculator'),
+    taxMap: localePath('tax-map'),
     knowledge: localePath('knowledge'),
   };
 

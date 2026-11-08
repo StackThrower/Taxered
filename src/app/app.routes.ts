@@ -15,6 +15,10 @@ export const routes: Routes = [
           import('./pages/calculator/calculator-page').then((m) => m.CalculatorPage),
       },
       {
+        path: 'tax-map',
+        loadComponent: () => import('./pages/tax-map/tax-map-page').then((m) => m.TaxMapPage),
+      },
+      {
         path: 'about',
         loadComponent: () => import('./pages/about/about-page').then((m) => m.AboutPage),
       },
