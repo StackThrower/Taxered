@@ -23,6 +23,8 @@ import {
   getCurrencySymbol,
 } from '../../lib/nbu-exchange-rates';
 import type { DeclarationKind } from '../../lib/dps-xml/declaration';
+import { f1AssetCode } from '../../lib/dps-xml/f1';
+import { countryByIsin } from '../../lib/dps-xml/foreign-income';
 import { applyNbuRates } from '../../lib/position-rates';
 import { Icon } from '../../shared/icon';
 import {
@@ -39,6 +41,14 @@ import {
 } from './tax-model';
 
 const ANONYMOUS_VALUE = 'Не вказано';
+
+/** Ф1 column 2 codes for the manual override. */
+const F1_ASSET_CODES = [
+  { value: '1', label: 'корпоративні права, крім цінних паперів' },
+  { value: '2', label: 'цінні папери / деривативи на фондовій біржі' },
+  { value: '3', label: 'цінні папери / деривативи не на фондовій біржі' },
+  { value: '4', label: 'інвестиційні активи з джерел за межами України' },
+] as const;
 
 type PositionGroup = FormGroup<{
   [K in keyof Required<FinancialPosition>]: FormControl<FinancialPosition[K]>;
@@ -113,6 +123,10 @@ export class FormF0121214 {
   protected readonly years = REPORT_YEARS;
   protected readonly currencies = SUPPORTED_CURRENCIES;
   protected readonly ibGuidePath = localePath('knowledge', 'flex-report-ib');
+  protected readonly submitGuidePath = localePath('knowledge', 'submit-dps-package');
+  protected readonly assetCodes = F1_ASSET_CODES;
+  protected readonly countryHint = (p: FinancialPosition) => countryByIsin(p.isin);
+  protected readonly autoAssetCode = (p: FinancialPosition) => f1AssetCode({ ...p, assetCode: '' });
   protected readonly getCurrencySymbol = getCurrencySymbol;
   protected readonly fxDifference = positionFxDifference;
 
@@ -168,6 +182,18 @@ export class FormF0121214 {
     return calculateTaxes(v.positions, v.year, taxOptions(v));
   });
   protected readonly militaryRate = computed(() => militaryTaxRateLabel(this.value().year));
+  protected readonly calcNotes = computed(() =>
+    calculationNotes(this.calculations(), this.value().positions),
+  );
+  /** Fields for tax withheld by a Ukrainian broker matter only when there is one. */
+  protected readonly hasUkrainianBroker = computed(() => {
+    const v = this.value();
+    return (
+      !!v.withheldPdfo ||
+      !!v.withheldMilitaryLevy ||
+      v.positions.some((p) => p.brokerJurisdiction === 'ua')
+    );
+  });
 
   protected readonly importing = signal(false);
   protected readonly importProgress = signal(0);
@@ -522,13 +548,13 @@ export class FormF0121214 {
     );
   }
 
-  /** XML of annex Ф1 (F0121215) for import into the DPS e-cabinet. */
+  /** XML package for the DPS e-cabinet: declaration F0100215 with annex Ф1 F0121215. */
   protected async exportXml(): Promise<void> {
     const v = this.form.getRawValue();
     if (v.anonymous) {
       this.xmlMessage.set({
         error: true,
-        text: 'Для XML потрібні справжні ПІБ, ІПН і код ДПІ — зніміть позначку «Заповнити анонімно».',
+        text: 'Для пакета XML потрібні справжні ПІБ, ІПН і код ДПІ — зніміть позначку «Заповнити анонімно».',
       });
       return;
     }

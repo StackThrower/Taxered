@@ -50,7 +50,7 @@
             aria-describedby="taxOfficeCode-hint"
           />
           <p id="taxOfficeCode-hint" class="text-xs text-muted-foreground">
-            Потрібен для XML-файлу для Електронного кабінету
+            Код ДПІ за податковою адресою (3–4 цифри) — потрібен для пакета XML
           </p>
         </div>
         <div class="md:col-span-2">
@@ -60,6 +60,138 @@
           </label>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Declaration header F0100215 -->
+  <div class="card border-border/50">
+    <div class="card-content space-y-4">
+      <h4 class="text-lg font-semibold text-accent">Дані для декларації F0100215</h4>
+      <p class="text-sm text-muted-foreground">
+        Потрібні лише для пакета XML. Дані не зберігаються й нікуди не надсилаються — вони
+        потрапляють тільки у файли, які ви завантажуєте.
+      </p>
+      @let kind = value().declarationKind;
+      <div class="grid gap-4 md:grid-cols-3">
+        <div class="space-y-2">
+          <label class="label" for="declarationKind">Тип декларації</label>
+          <select id="declarationKind" class="input" formControlName="declarationKind">
+            <option value="original">Звітна</option>
+            <option value="new">Звітна нова</option>
+            <option value="clarifying">Уточнююча</option>
+          </select>
+        </div>
+        @if (kind !== 'original') {
+          <div class="space-y-2">
+            <label class="label" for="docNumber">Номер документа за період</label>
+            <input
+              id="docNumber"
+              class="input"
+              formControlName="docNumber"
+              inputmode="numeric"
+              aria-describedby="docNumber-hint"
+            />
+            <p id="docNumber-hint" class="text-xs text-muted-foreground">
+              1 — перша нова звітна чи уточнююча за цей рік, 2 — наступна тощо
+            </p>
+          </div>
+        }
+        @if (kind === 'clarifying') {
+          <div class="space-y-2">
+            <label class="label" for="clarifiedRegNumber"
+              >Реєстраційний номер документа, що уточнюється</label
+            >
+            <input
+              id="clarifiedRegNumber"
+              class="input"
+              formControlName="clarifiedRegNumber"
+              inputmode="numeric"
+              aria-describedby="clarifiedRegNumber-hint"
+            />
+            <p id="clarifiedRegNumber-hint" class="text-xs text-muted-foreground">
+              Є в квитанції №2 до поданої декларації
+            </p>
+          </div>
+        }
+      </div>
+      <div class="space-y-2">
+        <label class="label" for="taxOfficeName">Назва ДПІ, до якої подається декларація</label>
+        <input
+          id="taxOfficeName"
+          class="input"
+          formControlName="taxOfficeName"
+          placeholder="ГУ ДПС у м. Києві"
+        />
+      </div>
+      <fieldset class="space-y-4">
+        <legend class="text-sm font-semibold">Податкова адреса (місце проживання)</legend>
+        <div class="grid gap-4 md:grid-cols-3">
+          <div class="space-y-2">
+            <label class="label" for="region">Область</label>
+            <input
+              id="region"
+              class="input"
+              formControlName="region"
+              autocomplete="address-level1"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="district">Район</label>
+            <input id="district" class="input" formControlName="district" />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="city">Місто (селище, село)</label>
+            <input id="city" class="input" formControlName="city" autocomplete="address-level2" />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="street">Вулиця</label>
+            <input
+              id="street"
+              class="input"
+              formControlName="street"
+              autocomplete="address-line1"
+            />
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <div class="space-y-2">
+              <label class="label" for="building">Будинок</label>
+              <input id="building" class="input" formControlName="building" />
+            </div>
+            <div class="space-y-2">
+              <label class="label" for="corpus">Корпус</label>
+              <input id="corpus" class="input" formControlName="corpus" />
+            </div>
+            <div class="space-y-2">
+              <label class="label" for="apartment">Квартира</label>
+              <input id="apartment" class="input" formControlName="apartment" />
+            </div>
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="zip">Поштовий індекс</label>
+            <input
+              id="zip"
+              class="input"
+              formControlName="zip"
+              inputmode="numeric"
+              autocomplete="postal-code"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="phone">Телефон (за бажанням)</label>
+            <input id="phone" class="input" formControlName="phone" type="tel" autocomplete="tel" />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="email">Електронна адреса (за бажанням)</label>
+            <input
+              id="email"
+              class="input"
+              formControlName="email"
+              type="email"
+              autocomplete="email"
+            />
+          </div>
+        </div>
+      </fieldset>
     </div>
   </div>
 
@@ -75,6 +207,97 @@
           }
         </select>
       </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+          <label class="label" for="previousYearsLoss">Збиток минулих років (грн)</label>
+          <input
+            id="previousYearsLoss"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="0.00"
+            class="input"
+            formControlName="previousYearsLoss"
+            aria-describedby="previousYearsLoss-hint"
+          />
+          <p id="previousYearsLoss-hint" class="text-xs text-muted-foreground">
+            Рядок 3.2 торішнього Ф1, ще не погашений. Зменшує інвестиційний прибуток цього року
+            (рядок 2 Ф1).
+          </p>
+        </div>
+      </div>
+      @if (hasUkrainianBroker()) {
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <label class="label" for="withheldPdfo">ПДФО, утриманий брокером-агентом (грн)</label>
+            <input
+              id="withheldPdfo"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              class="input"
+              formControlName="withheldPdfo"
+              aria-describedby="withheld-hint"
+            />
+          </div>
+          <div class="space-y-2">
+            <label class="label" for="withheldMilitaryLevy">
+              Військовий збір, утриманий брокером-агентом (грн)
+            </label>
+            <input
+              id="withheldMilitaryLevy"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              class="input"
+              formControlName="withheldMilitaryLevy"
+              aria-describedby="withheld-hint"
+            />
+          </div>
+          <p id="withheld-hint" class="text-xs text-muted-foreground md:col-span-2">
+            Для українського брокера, який утримав податок як податковий агент (рядки 4.1 і 5.1 Ф1).
+            Іноземні брокери нічого не утримують.
+          </p>
+        </div>
+      }
+      <div class="space-y-3">
+        <label class="inline-flex cursor-pointer items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            class="size-4 accent-primary"
+            formControlName="hasForeignTaxCertificate"
+          />
+          Маю довідку іноземного податкового органу про сплачений податок
+        </label>
+        @if (value().hasForeignTaxCertificate) {
+          <div class="space-y-2">
+            <label class="label" for="foreignTaxCredit"
+              >Іноземний податок до зарахування (грн)</label
+            >
+            <input
+              id="foreignTaxCredit"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              class="input md:max-w-xs"
+              formControlName="foreignTaxCredit"
+              aria-describedby="foreignTaxCredit-hint"
+            />
+            <p
+              id="foreignTaxCredit-hint"
+              class="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              Зарахувати можна лише податок, підтверджений довідкою іноземного податкового органу,
+              легалізованою (з апостилем). Звіт брокера чи форма 1042-S такою довідкою не є. Сума
+              зменшує лише ПДФО (рядок 18 декларації, не більше рядка 13); військовий збір не
+              зменшується.
+            </p>
+          </div>
+        }
+      </div>
     </div>
   </div>
 
@@ -82,7 +305,7 @@
   <div formArrayName="positions" class="space-y-8">
     @for (position of value().positions; track position.id; let i = $index) {
       @let id = position.id;
-      @let isDividend = position.assetType === 'dividends';
+      @let isDividend = position.assetType === 'dividends' || position.assetType === 'interest';
       @let isForeign = position.currency !== 'UAH';
       <div class="card relative border-border/50" [formGroupName]="i">
         <div class="card-content space-y-4">
@@ -128,7 +351,39 @@
                 <option [value]="type.value">{{ type.label }}</option>
               }
             </select>
+            @if (position.assetType === 'crypto') {
+              <p class="text-xs text-amber-800 dark:text-amber-200">
+                Віртуальні активи до Ф1 не включаються: для них діє окремий режим оподаткування.
+              </p>
+            }
           </div>
+
+          @if (isDividend) {
+            <div class="space-y-2">
+              <label class="label" [for]="'country-' + id">Країна джерела доходу</label>
+              <input
+                [id]="'country-' + id"
+                class="input"
+                formControlName="country"
+                [placeholder]="countryHint(position) || 'Наприклад, США'"
+                [attr.aria-describedby]="'country-hint-' + id"
+              />
+              <p [id]="'country-hint-' + id" class="text-xs text-muted-foreground">
+                Для графи 2 рядка 10.10 декларації. Порожнє поле — країна за ISIN
+                {{ countryHint(position) ? '(' + countryHint(position) + ')' : '' }}.
+              </p>
+            </div>
+          } @else if (position.assetType && position.assetType !== 'real_estate') {
+            <div class="space-y-2">
+              <label class="label" [for]="'assetCode-' + id">Код виду активу (Ф1, графа 2)</label>
+              <select [id]="'assetCode-' + id" class="input" formControlName="assetCode">
+                <option value="">Автоматично ({{ autoAssetCode(position) }})</option>
+                @for (code of assetCodes; track code.value) {
+                  <option [value]="code.value">{{ code.value }} — {{ code.label }}</option>
+                }
+              </select>
+            </div>
+          }
 
           <div class="space-y-2">
             <label class="label" [for]="'currency-' + id">Валюта операції</label>
@@ -315,8 +570,13 @@
               <p
                 class="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200"
               >
-                <span aria-hidden="true">💡</span> Для дивідендів: ПДФО 9% + Військовий збір
-                {{ militaryRate() }}%
+                <span aria-hidden="true">💡</span>
+                {{
+                  position.assetType === 'interest'
+                    ? 'Для процентів і купонів: ПДФО 18%'
+                    : 'Для дивідендів: ПДФО 9%'
+                }}
+                + Військовий збір {{ militaryRate() }}%
               </p>
             </div>
           } @else {
@@ -509,6 +769,13 @@
           <p class="text-xs text-muted-foreground">грн</p>
         </div>
       </div>
+      @if (calcNotes().length > 0) {
+        <ul class="list-disc space-y-1 pl-5 text-sm text-muted-foreground" aria-live="polite">
+          @for (note of calcNotes(); track note) {
+            <li>{{ note }}</li>
+          }
+        </ul>
+      }
     </div>
   </section>
 
@@ -578,20 +845,25 @@
           <div class="space-y-3">
             <div class="flex items-center gap-2">
               <span class="size-2 rounded-full bg-purple-500" aria-hidden="true"></span>
-              <h5 class="text-sm font-semibold">Дивіденди</h5>
+              <h5 class="text-sm font-semibold">Дивіденди та інші іноземні доходи (рядок 10.10)</h5>
             </div>
             <div class="grid gap-3 pl-4 md:grid-cols-3">
               <div class="space-y-1 rounded-md border border-border bg-background p-3">
-                <p class="text-xs text-muted-foreground">Отримано дивідендів</p>
+                <p class="text-xs text-muted-foreground">Отримано (брутто)</p>
                 <p class="text-lg font-bold text-purple-600 dark:text-purple-400">
                   {{ calc.dividends.toFixed(2) }} ₴
                 </p>
               </div>
               <div class="space-y-1 rounded-md border border-border bg-background p-3">
-                <p class="text-xs text-muted-foreground">ПДФО (9%)</p>
+                <p class="text-xs text-muted-foreground">ПДФО (9% / 18%)</p>
                 <p class="text-lg font-bold text-blue-600 dark:text-blue-400">
                   {{ calc.pdfoFromDividends.toFixed(2) }} ₴
                 </p>
+                @if (calc.foreignTaxCredit > 0) {
+                  <p class="text-xs text-muted-foreground">
+                    Зараховано іноземний податок: −{{ calc.foreignTaxCredit.toFixed(2) }} ₴
+                  </p>
+                }
               </div>
               <div class="space-y-1 rounded-md border border-border bg-background p-3">
                 <p class="text-xs text-muted-foreground">Військовий збір ({{ militaryRate() }}%)</p>
@@ -605,7 +877,8 @@
                 class="flex items-center gap-2 rounded-md bg-purple-100 p-2 text-xs text-purple-900 dark:bg-purple-950/30 dark:text-purple-100"
               >
                 <span class="text-lg" aria-hidden="true">💡</span>
-                Для дивідендів застосовується знижена ставка ПДФО 9% замість стандартних 18%
+                Для дивідендів від нерезидентів — знижена ставка ПДФО 9%; проценти, купони та інші
+                іноземні доходи — 18%
               </p>
             </div>
           </div>
@@ -641,8 +914,8 @@
         (click)="exportXml()"
       >
         <svg [appIcon]="icons.FileCode" class="size-4 md:size-5"></svg>
-        <span class="truncate md:hidden">XML Ф1</span>
-        <span class="hidden md:inline">XML для Е-кабінету</span>
+        <span class="truncate md:hidden">Пакет XML</span>
+        <span class="hidden md:inline">Завантажити пакет для Е-кабінету</span>
       </button>
       <button
         type="button"
@@ -671,8 +944,14 @@
     </div>
 
     <p id="xml-export-hint" class="text-sm leading-relaxed text-muted-foreground">
-      XML — додаток Ф1 (F0121215) з усіма позиціями для завантаження в Електронний кабінет
-      платника. Дивіденди та нерухомість до Ф1 не входять.
+      Пакет XML — декларація F0100215 і, якщо є операції з інвестиційними активами, додаток Ф1
+      F0121215 для імпорту в Електронний кабінет. Не перейменовуйте файли: декларація і Ф1
+      посилаються один на одного за іменами.
+      <a
+        [routerLink]="submitGuidePath"
+        class="font-medium text-primary underline-offset-4 hover:underline"
+        >Як подати пакет</a
+      >
     </p>
 
     <p

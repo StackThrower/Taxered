@@ -524,7 +524,7 @@ function getAssetTypeLabel(assetType: string, language: string): string {
 function getTranslations(militaryTaxPercent: string = '5') {
   const translations = {
     uk: {
-      title: "Розрахунок податкових зобов'язань (Додаток Ф1 / F0121214)",
+      title: "Розрахунок податкових зобов'язань (Додаток Ф1 / F0121215)",
       personalInfo: 'Персональна інформація',
       fullName: 'ПІБ',
       taxNumber: 'ІПН',
