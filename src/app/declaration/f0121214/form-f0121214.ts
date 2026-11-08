@@ -488,12 +488,14 @@ export class FormF0121214 {
       return;
     }
 
-    const { buildF1Xml, downloadF1Xml } = await import('../../lib/f1-xml-generator');
-    const result = buildF1Xml({
-      fullName: v.fullName,
-      taxNumber: v.taxNumber,
-      taxOfficeCode: v.taxOfficeCode,
+    const { buildDeclarationPackage, downloadPackage } = await import('../../lib/dps-xml/package');
+    const result = buildDeclarationPackage({
       year: v.year,
+      taxpayer: {
+        fullName: v.fullName,
+        taxNumber: v.taxNumber,
+        taxOfficeCode: v.taxOfficeCode,
+      },
       positions: v.positions,
       fillDate: new Date(),
     });
@@ -506,15 +508,14 @@ export class FormF0121214 {
       return;
     }
 
-    downloadF1Xml(result.xml, result.fileName);
-    this.xmlMessage.set(
-      result.skipped > 0
-        ? {
-            error: false,
-            text: `У Ф1 включено ${result.rows.length} операцій. Дивіденди, нерухомість і порожні рядки (${result.skipped}) до Ф1 не входять — їх декларують в основній декларації.`,
-          }
-        : null,
-    );
+    await downloadPackage(result.files);
+    const notes = [...result.warnings];
+    if (result.f1 && result.f1.skipped > 0) {
+      notes.unshift(
+        `У Ф1 включено ${result.f1.rows.length} операцій. Дивіденди, нерухомість і порожні рядки (${result.f1.skipped}) до Ф1 не входять — їх декларують в основній декларації.`,
+      );
+    }
+    this.xmlMessage.set(notes.length > 0 ? { error: false, text: notes.join(' ') } : null);
   }
 
   protected clear(): void {
