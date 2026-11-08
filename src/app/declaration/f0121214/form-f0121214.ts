@@ -22,6 +22,7 @@ import {
   formatExchangeRate,
   getCurrencySymbol,
 } from '../../lib/nbu-exchange-rates';
+import type { DeclarationKind } from '../../lib/dps-xml/declaration';
 import { applyNbuRates } from '../../lib/position-rates';
 import { Icon } from '../../shared/icon';
 import {
@@ -132,6 +133,9 @@ export class FormF0121214 {
     hasForeignTaxCertificate: control(false),
     foreignTaxCredit: control(''),
     // Declaration header; kept in memory only, like every other field of the form.
+    declarationKind: control<DeclarationKind>('original'),
+    docNumber: control('1'),
+    clarifiedRegNumber: control(''),
     taxOfficeName: control(''),
     region: control(''),
     district: control(''),
@@ -556,6 +560,11 @@ export class FormF0121214 {
       },
       positions: v.positions,
       options: taxOptions(v),
+      meta: {
+        kind: v.declarationKind,
+        docNumber: v.docNumber,
+        clarifiedRegNumber: v.clarifiedRegNumber,
+      },
       fillDate: new Date(),
     });
 

@@ -9,6 +9,7 @@ import {
   computeDeclaration,
   renderDeclarationBody,
   type DeclarationCalculation,
+  type DeclarationKind,
 } from './declaration';
 import { encodeWindows1251, unencodableChars } from './encoding';
 import { computeF1, renderF1Rows, type F1Calculation } from './f1';
@@ -37,9 +38,24 @@ export interface PackageInput {
   taxpayer: Taxpayer;
   positions: readonly FinancialPosition[];
   options?: TaxOptions;
+  meta?: DeclarationMeta;
   /** Fill date; passed in so the output is deterministic. */
   fillDate: Date;
 }
+
+/** Type of the return: "звітна", "звітна нова" or "уточнююча". */
+export interface DeclarationMeta {
+  kind: DeclarationKind;
+  /**
+   * C_DOC_TYPE: 0 for the first document of the period, +1 for each next new or clarifying one.
+   * Ignored for an original return.
+   */
+  docNumber?: string;
+  /** HNUM_U: registration number of the document being clarified (required by the XSD). */
+  clarifiedRegNumber?: string;
+}
+
+const DOC_STATE = { original: 1, new: 2, clarifying: 3 } as const;
 
 export interface PackageFile {
   kind: 'declaration' | 'f1';
@@ -63,6 +79,12 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
   if (taxpayerError) {
     return { ok: false, ...taxpayerError };
   }
+  const meta = input.meta ?? { kind: 'original' };
+  const metaError = validateMeta(meta);
+  if (metaError) {
+    return { ok: false, ...metaError };
+  }
+  const docType = meta.kind === 'original' ? 0 : parseInt(meta.docNumber ?? '');
   const year = parseInt(input.year);
   const version = formVersion(year);
   if (!version) {
@@ -104,9 +126,9 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
   const declarationDoc: DocCode = {
     cDocSub: C_DOC_SUB.declaration,
     cDocVer: version.declaration,
-    cDocType: 0,
+    cDocType: docType,
     cDocCnt: 1,
-    cDocStan: 1,
+    cDocStan: DOC_STATE[meta.kind],
   };
   const f1Doc: DocCode = { ...declarationDoc, cDocSub: C_DOC_SUB.f1, cDocVer: version.f1 };
 
@@ -120,7 +142,8 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
         renderHead(ctx, declarationDoc, declarationLinks),
         renderDeclarationBody(
           {
-            kind: 'original',
+            kind: meta.kind,
+            clarifiedRegNumber: meta.clarifiedRegNumber,
             year,
             taxpayer: input.taxpayer,
             tin,
@@ -140,8 +163,10 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
         docFileName(ctx, f1Doc),
         xmlDocument(schemaName(f1Doc), renderHead(ctx, f1Doc, [{ type: 2, doc: declarationDoc }]), [
           el('HTIN', tin),
-          el('HZ', 1),
+          el(F1_KIND[meta.kind], 1),
           el('HZY', year),
+          // HZYP: period being clarified, the same report year.
+          ...(meta.kind === 'clarifying' ? [el('HZYP', year)] : []),
           ...renderF1Rows(f1),
           el('HBOS', fullName),
         ]),
@@ -161,6 +186,32 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
     f1,
     declaration,
   };
+}
+
+/** Choice HZ | HZN | HZU of Ф1. */
+const F1_KIND = { original: 'HZ', new: 'HZN', clarifying: 'HZU' } as const;
+
+function validateMeta(meta: DeclarationMeta): FieldError | null {
+  if (meta.kind === 'original') {
+    return null;
+  }
+  const docNumber = meta.docNumber?.trim() ?? '';
+  if (!/^\d{1,2}$/.test(docNumber) || parseInt(docNumber) < 1) {
+    return {
+      field: 'docNumber',
+      message:
+        'Вкажіть порядковий номер документа за цей період: 1 для першої нової звітної чи уточнюючої декларації, 2 — для наступної тощо.',
+    };
+  }
+  const regNumber = meta.clarifiedRegNumber?.trim() ?? '';
+  if (meta.kind === 'clarifying' && !/^0*[1-9]\d{0,18}$/.test(regNumber)) {
+    return {
+      field: 'clarifiedRegNumber',
+      message:
+        'Для уточнюючої декларації вкажіть реєстраційний номер документа, який уточнюється (є в квитанції з Електронного кабінету).',
+    };
+  }
+  return null;
 }
 
 function toFile(kind: PackageFile['kind'], name: string, xml: string): PackageFile {

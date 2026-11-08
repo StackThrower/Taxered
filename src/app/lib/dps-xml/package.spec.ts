@@ -352,3 +352,74 @@ describe('buildDeclarationPackage: declaration F0100215', () => {
     }
   });
 });
+
+describe('buildDeclarationPackage: return types', () => {
+  const trades = [position({ purchasePrice: '10000', salePrice: '15000' })];
+
+  it('writes a clarifying return in both files with matching names and links', () => {
+    const { files } = build(trades, {
+      meta: { kind: 'clarifying', docNumber: '1', clarifiedRegNumber: '9876543210' },
+    });
+    const [declaration, f1] = files;
+
+    expect(declaration.name).toBe('26501234567890F0100215301000000151220252650.xml');
+    expect(f1.name).toBe('26501234567890F0121215301000000151220252650.xml');
+    for (const file of files) {
+      expect(file.xml).toContain('<C_DOC_TYPE>1</C_DOC_TYPE><C_DOC_CNT>1</C_DOC_CNT>');
+      expect(file.xml).toContain('<C_DOC_STAN>3</C_DOC_STAN><LINKED_DOCS>');
+      expectValid(file);
+    }
+    expect(declaration.xml).toContain(`<FILENAME>${f1.name}</FILENAME>`);
+    expect(f1.xml).toContain(`<FILENAME>${declaration.name}</FILENAME>`);
+    expect(declaration.xml).toContain(
+      '<HZU>1</HZU><HNUM_U>9876543210</HNUM_U><HZY>2025</HZY><HZYP>2025</HZYP>',
+    );
+    expect(f1.xml).toContain('<HZU>1</HZU><HZY>2025</HZY><HZYP>2025</HZYP>');
+  });
+
+  it('writes a new original return with C_DOC_STAN 2', () => {
+    const { files } = build(trades, { meta: { kind: 'new', docNumber: '2' } });
+
+    for (const file of files) {
+      expect(file.xml).toContain('<C_DOC_TYPE>2</C_DOC_TYPE>');
+      expect(file.xml).toContain('<C_DOC_STAN>2</C_DOC_STAN>');
+      expect(file.xml).toContain('<HZN>1</HZN><HZY>2025</HZY>');
+      expect(file.xml).not.toContain('HZYP');
+      expect(file.name.slice(22, 25)).toBe('202');
+      expectValid(file);
+    }
+  });
+
+  it('asks for the document number and the clarified registration number', () => {
+    const attempt = (meta: PackageInput['meta']) =>
+      buildDeclarationPackage({ ...base, meta, positions: trades });
+
+    expect(attempt({ kind: 'new' })).toMatchObject({ ok: false, field: 'docNumber' });
+    expect(attempt({ kind: 'clarifying', docNumber: '0' })).toMatchObject({
+      ok: false,
+      field: 'docNumber',
+    });
+    expect(attempt({ kind: 'clarifying', docNumber: '1' })).toMatchObject({
+      ok: false,
+      field: 'clarifiedRegNumber',
+    });
+    expect(attempt({ kind: 'original', docNumber: '5' })).toMatchObject({ ok: true });
+  });
+
+  it('builds 1 000 valid lots in under a second', () => {
+    const many = Array.from({ length: 1000 }, (_, i) =>
+      position({
+        symbol: `T${i}`,
+        purchasePrice: String(1000 + i),
+        salePrice: String(1100 + i * 2),
+      }),
+    );
+    const started = performance.now();
+    const { files } = build(many);
+    const elapsed = performance.now() - started;
+
+    expect(elapsed).toBeLessThan(1000);
+    expect(files[1].xml).toContain('<T1RXXXXG2 ROWNUM="1000">');
+    files.forEach(expectValid);
+  });
+});
