@@ -24,7 +24,8 @@ export interface PageSeo {
 }
 
 const TITLE_SUFFIX = ' | Taxered';
-const OG_IMAGE = `${SITE_URL}/placeholder-logo.png`;
+/** 1200×630 PNG; the declared size and type below must match the file. */
+const OG_IMAGE = `${SITE_URL}/og-image.png`;
 const DEFAULT_AUTHOR = 'Taxered';
 const ROBOTS = 'index, follow, max-video-preview:-1, max-image-preview:large, max-snippet:-1';
 
@@ -56,6 +57,7 @@ export class SeoService {
     this.setProperty('og:title', page.title);
     this.setProperty('og:description', page.description);
     this.setProperty('og:image', OG_IMAGE);
+    this.setProperty('og:image:type', 'image/png');
     this.setProperty('og:image:width', '1200');
     this.setProperty('og:image:height', '630');
     this.setProperty('og:image:alt', page.title);
