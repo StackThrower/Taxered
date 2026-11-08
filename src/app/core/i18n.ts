@@ -9,7 +9,6 @@ export const UK = {
     forms: 'Форми',
     calculator: 'Калькулятор',
     help: 'Допомога',
-    orderWebsite: 'Розробник вебсайту',
     openMenu: 'Відкрити меню',
     closeMenu: 'Закрити меню',
     mainNav: 'Основна навігація',
@@ -317,8 +316,6 @@ export const UK = {
     relatedArticles: 'Схожі статті',
     readTime: 'Час читання',
     publishedAt: 'Опубліковано',
-    author: 'Автор',
-    authorProfile: 'профіль у LinkedIn',
   },
   taxMap: {
     nav: 'Карта податків',
