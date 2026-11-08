@@ -30,6 +30,7 @@ import {
   DEFAULT_REPORT_YEAR,
   FinancialPosition,
   REPORT_YEARS,
+  TaxOptions,
   calculateTaxes,
   calculationNotes,
   militaryTaxRateLabel,
@@ -75,6 +76,7 @@ function positionGroup(p: FinancialPosition): PositionGroup {
     purchaseCommissionCurrency: control(p.purchaseCommissionCurrency),
     saleCommissionForeign: control(p.saleCommissionForeign),
     saleCommissionCurrency: control(p.saleCommissionCurrency),
+    country: control(p.country),
   });
 }
 
@@ -127,6 +129,20 @@ export class FormF0121214 {
     previousYearsLoss: control(''),
     withheldPdfo: control(''),
     withheldMilitaryLevy: control(''),
+    hasForeignTaxCertificate: control(false),
+    foreignTaxCredit: control(''),
+    // Declaration header; kept in memory only, like every other field of the form.
+    taxOfficeName: control(''),
+    region: control(''),
+    district: control(''),
+    city: control(''),
+    street: control(''),
+    building: control(''),
+    corpus: control(''),
+    apartment: control(''),
+    zip: control(''),
+    phone: control(''),
+    email: control(''),
     positions: new FormArray<PositionGroup>([positionGroup(this.emptyPosition())]),
   });
 
@@ -145,11 +161,7 @@ export class FormF0121214 {
 
   protected readonly calculations = computed(() => {
     const v = this.value();
-    return calculateTaxes(v.positions, v.year, {
-      previousYearsLoss: v.previousYearsLoss,
-      withheldPdfo: v.withheldPdfo,
-      withheldMilitaryLevy: v.withheldMilitaryLevy,
-    });
+    return calculateTaxes(v.positions, v.year, taxOptions(v));
   });
   protected readonly militaryRate = computed(() => militaryTaxRateLabel(this.value().year));
 
@@ -528,13 +540,22 @@ export class FormF0121214 {
         fullName: v.fullName,
         taxNumber: v.taxNumber,
         taxOfficeCode: v.taxOfficeCode,
+        taxOfficeName: v.taxOfficeName,
+        address: {
+          region: v.region,
+          district: v.district,
+          city: v.city,
+          street: v.street,
+          building: v.building,
+          corpus: v.corpus,
+          apartment: v.apartment,
+          zip: v.zip,
+        },
+        phone: v.phone,
+        email: v.email,
       },
       positions: v.positions,
-      options: {
-        previousYearsLoss: v.previousYearsLoss,
-        withheldPdfo: v.withheldPdfo,
-        withheldMilitaryLevy: v.withheldMilitaryLevy,
-      },
+      options: taxOptions(v),
       fillDate: new Date(),
     });
 
@@ -611,4 +632,20 @@ export class FormF0121214 {
       multiplier: '1',
     };
   }
+}
+
+/** Annual inputs of the calculation; the foreign tax counts only with a certificate. */
+function taxOptions(v: {
+  previousYearsLoss: string;
+  withheldPdfo: string;
+  withheldMilitaryLevy: string;
+  hasForeignTaxCertificate: boolean;
+  foreignTaxCredit: string;
+}): TaxOptions {
+  return {
+    previousYearsLoss: v.previousYearsLoss,
+    withheldPdfo: v.withheldPdfo,
+    withheldMilitaryLevy: v.withheldMilitaryLevy,
+    foreignTaxCredit: v.hasForeignTaxCertificate ? v.foreignTaxCredit : '',
+  };
 }

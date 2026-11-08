@@ -1,16 +1,31 @@
 /**
- * The package for the DPS e-cabinet: windows-1251 XML files named by the standard. Nothing here
- * talks to the network; the files are built and downloaded in the browser.
+ * The package for the DPS e-cabinet: declaration F0100215 and, when there is investment profit
+ * or loss to report, annex Ф1 F0121215, each a windows-1251 XML named by the standard and linked
+ * to the other through LINKED_DOCS. Nothing here talks to the network: the files are built and
+ * downloaded in the browser.
  */
 import type { FinancialPosition, TaxOptions } from '../../declaration/f0121214/tax-model';
+import {
+  computeDeclaration,
+  renderDeclarationBody,
+  type DeclarationCalculation,
+} from './declaration';
 import { encodeWindows1251, unencodableChars } from './encoding';
 import { computeF1, renderF1Rows, type F1Calculation } from './f1';
+import { computeForeignIncome } from './foreign-income';
+import {
+  docFileName,
+  renderHead,
+  schemaName,
+  type DocCode,
+  type DocContext,
+  type LinkedDoc,
+} from './header';
 import { toKopecks } from './money';
-import { docFileName, renderHead, schemaName, type DocCode, type DocContext } from './header';
 import {
   normalizeTaxOffice,
   normalizeTin,
-  validateIdentity,
+  validateTaxpayer,
   type FieldError,
   type Taxpayer,
 } from './taxpayer';
@@ -19,7 +34,7 @@ import { el, xmlDocument } from './xml';
 
 export interface PackageInput {
   year: string;
-  taxpayer: Pick<Taxpayer, 'fullName' | 'taxNumber' | 'taxOfficeCode'>;
+  taxpayer: Taxpayer;
   positions: readonly FinancialPosition[];
   options?: TaxOptions;
   /** Fill date; passed in so the output is deterministic. */
@@ -34,13 +49,19 @@ export interface PackageFile {
 }
 
 export type PackageResult =
-  | { ok: true; files: PackageFile[]; warnings: string[]; f1: F1Calculation | null }
+  | {
+      ok: true;
+      files: PackageFile[];
+      warnings: string[];
+      f1: F1Calculation | null;
+      declaration: DeclarationCalculation;
+    }
   | ({ ok: false } & FieldError);
 
 export function buildDeclarationPackage(input: PackageInput): PackageResult {
-  const identityError = validateIdentity(input.taxpayer);
-  if (identityError) {
-    return { ok: false, ...identityError };
+  const taxpayerError = validateTaxpayer(input.taxpayer);
+  if (taxpayerError) {
+    return { ok: false, ...taxpayerError };
   }
   const year = parseInt(input.year);
   const version = formVersion(year);
@@ -51,6 +72,26 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
     };
   }
 
+  const options = input.options ?? {};
+  const f1Calc = computeF1(input.positions, year, {
+    previousYearsLoss: toKopecks(options.previousYearsLoss),
+    withheldPdfo: toKopecks(options.withheldPdfo),
+    withheldMilitaryLevy: toKopecks(options.withheldMilitaryLevy),
+  });
+  const foreign = computeForeignIncome(input.positions, year);
+  const f1 = f1Calc.rows.length > 0 && !f1Calc.belowThreshold ? f1Calc : null;
+  if (!f1 && foreign.total === 0) {
+    return {
+      ok: false,
+      message: f1Calc.belowThreshold
+        ? `${f1Calc.warnings[f1Calc.warnings.length - 1]} Інших доходів для декларування немає.`
+        : 'Немає доходів для декларування: додайте закриті позиції, дивіденди або інші іноземні доходи.',
+    };
+  }
+  const declaration = computeDeclaration(f1, foreign, {
+    foreignTaxCredit: toKopecks(options.foreignTaxCredit),
+  });
+
   const tin = normalizeTin(input.taxpayer.taxNumber);
   const fullName = input.taxpayer.fullName.trim();
   const ctx: DocContext = {
@@ -60,38 +101,66 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
     fillDate: formatDdMmYyyy(input.fillDate),
   };
 
-  const options = input.options ?? {};
-  const f1 = computeF1(input.positions, year, {
-    previousYearsLoss: toKopecks(options.previousYearsLoss),
-    withheldPdfo: toKopecks(options.withheldPdfo),
-    withheldMilitaryLevy: toKopecks(options.withheldMilitaryLevy),
-  });
-  if (f1.rows.length === 0 || f1.belowThreshold) {
-    return {
-      ok: false,
-      message: f1.belowThreshold
-        ? f1.warnings[f1.warnings.length - 1]
-        : 'Немає операцій з інвестиційними активами для додатка Ф1. Дивіденди та нерухомість у Ф1 не включаються.',
-    };
-  }
-
-  const f1Doc: DocCode = {
-    cDocSub: C_DOC_SUB.f1,
-    cDocVer: version.f1,
+  const declarationDoc: DocCode = {
+    cDocSub: C_DOC_SUB.declaration,
+    cDocVer: version.declaration,
     cDocType: 0,
     cDocCnt: 1,
     cDocStan: 1,
   };
-  const xml = xmlDocument(schemaName(f1Doc), renderHead(ctx, f1Doc, []), [
-    el('HTIN', tin),
-    el('HZ', 1),
-    el('HZY', year),
-    ...renderF1Rows(f1),
-    el('HBOS', fullName),
-  ]);
+  const f1Doc: DocCode = { ...declarationDoc, cDocSub: C_DOC_SUB.f1, cDocVer: version.f1 };
 
-  const files = [toFile('f1', docFileName(ctx, f1Doc), xml)];
-  return { ok: true, files, warnings: [...f1.warnings, ...encodingWarnings(files)], f1 };
+  const declarationLinks: LinkedDoc[] = f1 ? [{ type: 1, doc: f1Doc }] : [];
+  const files = [
+    toFile(
+      'declaration',
+      docFileName(ctx, declarationDoc),
+      xmlDocument(
+        schemaName(declarationDoc),
+        renderHead(ctx, declarationDoc, declarationLinks),
+        renderDeclarationBody(
+          {
+            kind: 'original',
+            year,
+            taxpayer: input.taxpayer,
+            tin,
+            hasF1: !!f1,
+            fillDate: ctx.fillDate,
+          },
+          declaration,
+        ),
+      ),
+    ),
+  ];
+
+  if (f1) {
+    files.push(
+      toFile(
+        'f1',
+        docFileName(ctx, f1Doc),
+        xmlDocument(schemaName(f1Doc), renderHead(ctx, f1Doc, [{ type: 2, doc: declarationDoc }]), [
+          el('HTIN', tin),
+          el('HZ', 1),
+          el('HZY', year),
+          ...renderF1Rows(f1),
+          el('HBOS', fullName),
+        ]),
+      ),
+    );
+  }
+
+  return {
+    ok: true,
+    files,
+    warnings: [
+      ...f1Calc.warnings,
+      ...foreign.warnings,
+      ...declaration.warnings,
+      ...encodingWarnings(files),
+    ],
+    f1,
+    declaration,
+  };
 }
 
 function toFile(kind: PackageFile['kind'], name: string, xml: string): PackageFile {

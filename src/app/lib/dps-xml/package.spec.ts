@@ -25,6 +25,10 @@ const base: Omit<PackageInput, 'positions'> = {
     fullName: 'Іваненко Іван Іванович',
     taxNumber: '1234567890',
     taxOfficeCode: '2650',
+    taxOfficeName: 'ГУ ДПС у м. Києві',
+    address: { city: 'Київ', street: 'Хрещатик', building: '1', apartment: '2', zip: '01001' },
+    phone: '+380 44 000 00 00',
+    email: 'ivan@example.com',
   },
   fillDate: new Date(2026, 2, 15),
 };
@@ -178,7 +182,7 @@ describe('buildDeclarationPackage: Ф1', () => {
 
   it('escapes XML special characters and warns about characters outside windows-1251', () => {
     const result = build([position({ salePrice: '10000', assetDescription: 'AT&T <Inc> "€✓"' })]);
-    const file = result.files[0];
+    const file = result.files.find((f) => f.kind === 'f1')!;
 
     expect(file.xml).toContain('AT&amp;T &lt;Inc&gt; &quot;€✓&quot;');
     expect(result.warnings.join()).toContain('«✓»');
@@ -193,5 +197,158 @@ describe('encodeWindows1251', () => {
 
   it('replaces characters outside the code page', () => {
     expect([...encodeWindows1251('€✓')]).toEqual([0x88, 0x3f]);
+  });
+});
+
+describe('buildDeclarationPackage: declaration F0100215', () => {
+  const reference = [
+    position({
+      symbol: 'AAPL',
+      purchasePrice: '63000.00',
+      salePrice: '83000.00',
+      expenses: '83.50',
+    }),
+    position({
+      symbol: 'MSFT',
+      purchasePrice: '86520.00',
+      salePrice: '79610.00',
+      expenses: '83.10',
+    }),
+    position({
+      assetType: 'dividends',
+      symbol: 'AAPL',
+      isin: 'US0378331005',
+      purchaseDate: '',
+      saleDate: '2025-03-15',
+      salePriceForeign: '100.00',
+      saleRate: '41.8000',
+      salePrice: '4180.00',
+    }),
+  ];
+
+  it('builds the reference package of the spec to the kopeck', () => {
+    const result = build(reference, { options: { previousYearsLoss: '3000.00' } });
+    const declaration = result.files.find((f) => f.kind === 'declaration')!;
+    const f1 = result.files.find((f) => f.kind === 'f1')!;
+
+    expect(declaration.name).toBe('26501234567890F0100215100000000151220252650.xml');
+    expect(f1.name).toBe('26501234567890F0121215100000000151220252650.xml');
+    expectValid(declaration);
+    expectValid(f1);
+
+    expect(f1.xml).toContain(
+      '<R001G4>162610.00</R001G4><R001G5>149686.60</R001G5><R001G6>12923.40</R001G6>',
+    );
+    expect(f1.xml).toContain(
+      '<R002G6>3000.00</R002G6><R003G6>9923.40</R003G6><R031G6>9923.40</R031G6>',
+    );
+    expect(f1.xml).toContain('<R004G6>1786.21</R004G6><R042G6>1786.21</R042G6>');
+    expect(f1.xml).toContain('<R005G6>496.17</R005G6><R052G6>496.17</R052G6>');
+
+    const x = declaration.xml;
+    expect(x).toContain('<R010G3>14103.40</R010G3><R010G6>2162.41</R010G6><R010G7>705.17</R010G7>');
+    expect(x).toContain(
+      '<R0108G3>9923.40</R0108G3><R0108G6>1786.21</R0108G6><R0108G7>496.17</R0108G7>',
+    );
+    expect(x).toContain(
+      '<R01010G2S>США; долар США</R01010G2S><R01010G3>4180.00</R01010G3><R01010G6>376.20</R01010G6><R01010G7>209.00</R01010G7>',
+    );
+    expect(x).toContain('<R012G3>14103.40</R012G3><R013G3>2162.41</R013G3>');
+    expect(x).not.toContain('R018G3');
+    expect(x).toContain('<R0201G3>2162.41</R0201G3><R0211G3>705.17</R0211G3>');
+    expect(x).toContain('<HD1>1</HD1><HFILL>15032026</HFILL><HBOS>Іваненко Іван Іванович</HBOS>');
+    expect(x).toContain('<HSTI>ГУ ДПС у м. Києві</HSTI><H01>1</H01><H03>1</H03><H05>1</H05>');
+  });
+
+  it('links the declaration and Ф1 to each other by file name', () => {
+    const { files } = build(reference);
+    const [declaration, f1] = files;
+    const link = (xml: string) =>
+      /<LINKED_DOCS><DOC NUM="1" TYPE="(\d)">.*<FILENAME>([^<]+)<\/FILENAME><\/DOC><\/LINKED_DOCS>/.exec(
+        xml,
+      );
+
+    expect(link(declaration.xml)?.slice(1)).toEqual(['1', f1.name]);
+    expect(link(f1.xml)?.slice(1)).toEqual(['2', declaration.name]);
+    expect(declaration.xml).toContain('<C_DOC_STAN>1</C_DOC_STAN><LINKED_DOCS>');
+    expect(declaration.xml).toContain('</LINKED_DOCS><D_FILL>');
+  });
+
+  it('builds only the declaration, without LINKED_DOCS, for dividends alone', () => {
+    const result = build([reference[2]]);
+
+    expect(result.files.map((f) => f.kind)).toEqual(['declaration']);
+    expect(result.files[0].xml).not.toContain('LINKED_DOCS');
+    expect(result.files[0].xml).not.toContain('HD1');
+    expectValid(result.files[0]);
+  });
+
+  it('files the declaration with dividends when trades stay within the threshold', () => {
+    const result = build([position({ purchasePrice: '100', salePrice: '4000' }), reference[2]]);
+
+    expect(result.files.map((f) => f.kind)).toEqual(['declaration']);
+    expect(result.warnings.join()).toContain('170.2.8');
+  });
+
+  it('taxes interest and coupons at 18% and credits foreign tax only up to row 13', () => {
+    const result = build(
+      [
+        position({
+          assetType: 'interest',
+          country: 'Ірландія',
+          currency: 'EUR',
+          salePrice: '1000.00',
+        }),
+        reference[2],
+      ],
+      { options: { foreignTaxCredit: '10000' } },
+    );
+    const x = result.files[0].xml;
+
+    // 4180 × 9% + 1000 × 18% = 376.20 + 180.00.
+    expect(x).toContain('<R01010G2S>Ірландія, США; євро, долар США</R01010G2S>');
+    expect(x).toContain('<R01010G6>556.20</R01010G6>');
+    expect(x).toContain('<R013G3>556.20</R013G3><R018G3>556.20</R018G3><R0211G3>259.00</R0211G3>');
+    expect(x).not.toContain('R0201G3');
+    expect(result.warnings.join()).toContain('рядка 13');
+    expectValid(result.files[0]);
+  });
+
+  it('reports investment loss in Ф1 with an empty income section', () => {
+    const result = build([position({ purchasePrice: '20000', salePrice: '10000' })]);
+    const [declaration, f1] = result.files;
+
+    expect(f1.xml).toContain('<R032G6>10000.00</R032G6>');
+    expect(declaration.xml).not.toContain('R0108');
+    expect(declaration.xml).toContain('<HD1>1</HD1>');
+    expectValid(declaration);
+    expectValid(f1);
+  });
+
+  it('requires the address and tax office name of the declaration header', () => {
+    const missing = (patch: Partial<PackageInput['taxpayer']>) =>
+      buildDeclarationPackage({
+        ...base,
+        taxpayer: { ...base.taxpayer, ...patch },
+        positions: reference,
+      });
+
+    expect(missing({ taxOfficeName: ' ' })).toMatchObject({ ok: false, field: 'taxOfficeName' });
+    expect(missing({ address: { city: '', street: 'x' } })).toMatchObject({
+      ok: false,
+      field: 'city',
+    });
+    expect(missing({ address: { city: 'x', street: 'y', zip: '123' } })).toMatchObject({
+      ok: false,
+      field: 'zip',
+    });
+  });
+
+  it('validates against older schema versions too', () => {
+    for (const year of ['2022', '2023', '2024']) {
+      for (const file of build(reference, { year }).files) {
+        expectValid(file);
+      }
+    }
   });
 });

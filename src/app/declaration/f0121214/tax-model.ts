@@ -1,16 +1,27 @@
+import { computeDeclaration } from '../../lib/dps-xml/declaration';
 import { computeF1, type F1Calculation } from '../../lib/dps-xml/f1';
-import { applyRate, toHryvnias, toKopecks } from '../../lib/dps-xml/money';
-import { RATE_BP, militaryLevyBp } from '../../lib/dps-xml/versions';
+import { computeForeignIncome, isForeignIncome } from '../../lib/dps-xml/foreign-income';
+import { toHryvnias, toKopecks } from '../../lib/dps-xml/money';
+import { militaryLevyBp } from '../../lib/dps-xml/versions';
 import type { BrokerSource } from '../../lib/ib-xml-parser';
 
 export type AssetType =
-  '' | 'stocks' | 'bonds' | 'options' | 'dividends' | 'crypto' | 'real_estate' | 'other';
+  | ''
+  | 'stocks'
+  | 'bonds'
+  | 'options'
+  | 'dividends'
+  | 'interest'
+  | 'crypto'
+  | 'real_estate'
+  | 'other';
 
 export const ASSET_TYPES: { value: Exclude<AssetType, ''>; label: string }[] = [
   { value: 'stocks', label: 'Акції' },
   { value: 'bonds', label: 'Облігації' },
   { value: 'options', label: 'Опціони' },
   { value: 'dividends', label: 'Дивіденди' },
+  { value: 'interest', label: 'Проценти, купони (іноземні)' },
   { value: 'crypto', label: 'Крипто активи' },
   { value: 'real_estate', label: 'Нерухоме майно' },
   { value: 'other', label: 'Інше' },
@@ -60,6 +71,8 @@ export interface FinancialPosition {
   purchaseCommissionCurrency?: string;
   saleCommissionForeign?: string;
   saleCommissionCurrency?: string;
+  /** Country of the income source for row 10.10; by default from the ISIN. */
+  country?: string;
 }
 
 export type BrokerJurisdiction = '' | 'foreign' | 'ua';
@@ -71,6 +84,11 @@ export interface TaxOptions {
   /** Ф1 rows 4.1 / 5.1: withheld by a Ukrainian broker as tax agent. */
   withheldPdfo?: string;
   withheldMilitaryLevy?: string;
+  /**
+   * Declaration row 18: foreign tax to credit. Set only when the taxpayer has a legalised
+   * certificate of the foreign tax authority.
+   */
+  foreignTaxCredit?: string;
 }
 
 export interface TaxCalculations {
@@ -88,6 +106,8 @@ export interface TaxCalculations {
   fxDifference: number;
   /** PDFO and military levy that the exchange-rate difference adds (negative if it lowers them). */
   taxOnFx: number;
+  /** Declaration row 18 in UAH: foreign tax credited against PDFO. */
+  foreignTaxCredit: number;
   /** Annex Ф1 rows, in kopecks; the source of the trade figures above. */
   f1: F1Calculation;
 }
@@ -129,24 +149,21 @@ export function calculateTaxes(
     withheldMilitaryLevy: toKopecks(options.withheldMilitaryLevy),
   });
 
-  let dividends = 0;
-  for (const pos of positions) {
-    if (pos.assetType === 'dividends') {
-      dividends += toKopecks(pos.salePrice);
-    }
-  }
+  const foreign = computeForeignIncome(positions, y);
+  const declaration = computeDeclaration(f1.belowThreshold ? null : f1, foreign, {
+    foreignTaxCredit: toKopecks(options.foreignTaxCredit),
+  });
 
   // Exchange-rate difference of the lots that made it into Ф1 (display only).
   const fxDifference = f1.belowThreshold
     ? 0
     : positions
-        .filter((p) => p.assetType !== 'dividends' && p.assetType !== 'crypto')
+        .filter((p) => !isForeignIncome(p) && p.assetType !== 'crypto')
         .reduce((sum, p) => sum + positionFxDifference(p), 0);
 
-  const pdfoFromDividends = dividends > 0 ? applyRate(dividends, RATE_BP.pdfoDividends) : 0;
-  const militaryFromDividends = dividends > 0 ? applyRate(dividends, militaryLevyBp(y)) : 0;
-  const pdfo = f1.pdfoPayable + pdfoFromDividends;
-  const militaryTax = f1.militaryLevyPayable + militaryFromDividends;
+  // Row 18 reduces PDFO only, never the military levy.
+  const pdfo = f1.pdfoPayable + foreign.pdfo - declaration.row18;
+  const militaryTax = f1.militaryLevyPayable + foreign.militaryLevy;
   const profitFromTrades = toHryvnias(f1.financialResult);
   const rate = militaryTaxRate(year);
   const withoutFx = Math.max(0, profitFromTrades - fxDifference);
@@ -154,18 +171,19 @@ export function calculateTaxes(
   const militaryTaxFromTrades = toHryvnias(f1.militaryLevyPayable);
 
   return {
-    profit: profitFromTrades + toHryvnias(dividends),
+    profit: profitFromTrades + toHryvnias(foreign.total),
     pdfo: toHryvnias(pdfo),
     militaryTax: toHryvnias(militaryTax),
     total: toHryvnias(pdfo + militaryTax),
     profitFromTrades,
-    dividends: toHryvnias(dividends),
+    dividends: toHryvnias(foreign.total),
     pdfoFromTrades,
-    pdfoFromDividends: toHryvnias(pdfoFromDividends),
+    pdfoFromDividends: toHryvnias(foreign.pdfo),
     militaryTaxFromTrades,
-    militaryTaxFromDividends: toHryvnias(militaryFromDividends),
+    militaryTaxFromDividends: toHryvnias(foreign.militaryLevy),
     fxDifference,
     taxOnFx: f1.profit > 0 ? pdfoFromTrades + militaryTaxFromTrades - withoutFx * (0.18 + rate) : 0,
+    foreignTaxCredit: toHryvnias(declaration.row18),
     f1,
   };
 }
@@ -176,7 +194,7 @@ export function calculateTaxes(
  * hryvnia rate alone, so it is taxed even when the trade broke even in the currency.
  */
 export function positionFxDifference(pos: TaxablePosition): number {
-  if (pos.assetType === 'dividends' || !pos.currency || pos.currency === 'UAH') {
+  if (isForeignIncome(pos) || !pos.currency || pos.currency === 'UAH') {
     return 0;
   }
   const purchase = Number.parseFloat(pos.purchasePriceForeign ?? '') || 0;
@@ -194,7 +212,7 @@ export function taxesOnIncome(
   dividends: number,
   year: string,
   fxDifference = 0,
-): Omit<TaxCalculations, 'f1'> {
+): Omit<TaxCalculations, 'f1' | 'foreignTaxCredit'> {
   const rate = militaryTaxRate(year);
   const withoutFx = Math.max(0, profitFromTrades - fxDifference);
   const pdfoFromTrades = profitFromTrades > 0 ? profitFromTrades * 0.18 : 0;
@@ -247,7 +265,7 @@ export function calculationNotes(
   }
   notes.push(...f1.warnings);
 
-  const trades = positions.filter((p) => p.assetType !== 'dividends');
+  const trades = positions.filter((p) => !isForeignIncome(p));
   const methods = [
     trades.some((p) => p.source === 'interactive_brokers')
       ? 'Interactive Brokers — закриті лоти зі звіту брокера'
