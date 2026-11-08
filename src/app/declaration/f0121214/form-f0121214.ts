@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { FileSpreadsheet, FileText, HelpCircle, Plus, Trash2, Upload } from 'lucide';
+import { FileCode, FileSpreadsheet, FileText, HelpCircle, Plus, Trash2, Upload } from 'lucide';
 import { map, startWith } from 'rxjs';
 import { localePath } from '../../core/site';
 import type { BrokerSource } from '../../lib/ib-xml-parser';
@@ -85,7 +85,15 @@ function hasData(p: FinancialPosition): boolean {
 export class FormF0121214 {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  protected readonly icons = { FileSpreadsheet, FileText, HelpCircle, Plus, Trash2, Upload };
+  protected readonly icons = {
+    FileCode,
+    FileSpreadsheet,
+    FileText,
+    HelpCircle,
+    Plus,
+    Trash2,
+    Upload,
+  };
   protected readonly assetTypes = ASSET_TYPES;
   protected readonly years = REPORT_YEARS;
   protected readonly currencies = SUPPORTED_CURRENCIES;
@@ -128,6 +136,9 @@ export class FormF0121214 {
   protected readonly importing = signal(false);
   protected readonly importProgress = signal(0);
   protected readonly importStatus = signal('');
+
+  /** Why the last XML export was refused, or a note about positions it left out. */
+  protected readonly xmlMessage = signal<{ error: boolean; text: string } | null>(null);
 
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
 
@@ -462,6 +473,50 @@ export class FormF0121214 {
     );
   }
 
+  /** XML of annex Ф1 (F0121215) for import into the DPS e-cabinet. */
+  protected async exportXml(): Promise<void> {
+    const v = this.form.getRawValue();
+    if (v.anonymous) {
+      this.xmlMessage.set({
+        error: true,
+        text: 'Для XML потрібні справжні ПІБ, ІПН і код ДПІ — зніміть позначку «Заповнити анонімно».',
+      });
+      return;
+    }
+    if (!this.validateIdentity()) {
+      this.xmlMessage.set(null);
+      return;
+    }
+
+    const { buildF1Xml, downloadF1Xml } = await import('../../lib/f1-xml-generator');
+    const result = buildF1Xml({
+      fullName: v.fullName,
+      taxNumber: v.taxNumber,
+      taxOfficeCode: v.taxOfficeCode,
+      year: v.year,
+      positions: v.positions,
+      fillDate: new Date(),
+    });
+
+    if (!result.ok) {
+      this.xmlMessage.set({ error: true, text: result.message });
+      if (result.field) {
+        this.host.nativeElement.querySelector<HTMLElement>(`#${result.field}`)?.focus();
+      }
+      return;
+    }
+
+    downloadF1Xml(result.xml, result.fileName);
+    this.xmlMessage.set(
+      result.skipped > 0
+        ? {
+            error: false,
+            text: `У Ф1 включено ${result.rows.length} операцій. Дивіденди, нерухомість і порожні рядки (${result.skipped}) до Ф1 не входять — їх декларують в основній декларації.`,
+          }
+        : null,
+    );
+  }
+
   protected clear(): void {
     this.form.reset({
       fullName: '',
@@ -472,6 +527,7 @@ export class FormF0121214 {
       anonymous: false,
     });
     this.replacePositions([this.emptyPosition()]);
+    this.xmlMessage.set(null);
   }
 
   private identity(): { fullName: string; taxNumber: string } {
