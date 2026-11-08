@@ -3,6 +3,8 @@
  * Parses FlexQuery XML files and extracts trade data for tax forms
  */
 
+import type { BrokerJurisdiction, FinancialPosition } from '../declaration/f0121214/tax-model';
+
 export type BrokerSource = 'interactive_brokers' | 'freedom_finance' | 'manual';
 
 export interface IBTrade {
@@ -19,8 +21,110 @@ export interface IBTrade {
   assetCategory: string;
   subCategory: string;
   multiplier: number;
+  isin?: string;
+  /** Settlement date of the closing trade (open question 1: the sale rate uses tradeDate). */
+  settleDate?: string;
+  /**
+   * From the closing Trade row (Execution section), pro rata to the lot quantity: gross sale
+   * proceeds and the sale commission. Missing when the report has Closed Lots only.
+   */
+  grossProceeds?: number;
+  saleCommission?: number;
+  saleCommissionCurrency?: string;
   source?: BrokerSource;
   sourceFile?: string;
+}
+
+/** Closing Trade row the lots belong to. */
+interface IBClosingTrade {
+  tradeId: string;
+  quantity: number;
+  proceeds: number;
+  commission: number;
+  commissionCurrency: string;
+  settleDate: string;
+}
+
+/** Attach proceeds and commission of the closing trade, pro rata to the lot quantity. */
+function withClosingTrade(lot: IBTrade, trade: IBClosingTrade | undefined): IBTrade {
+  if (!trade || !trade.quantity || !lot.quantity) {
+    return lot;
+  }
+  const share = Math.abs(lot.quantity) / Math.abs(trade.quantity);
+  return {
+    ...lot,
+    settleDate: trade.settleDate || lot.settleDate,
+    grossProceeds: round2(Math.abs(trade.proceeds) * share),
+    saleCommission: round2(Math.abs(trade.commission) * share),
+    saleCommissionCurrency: trade.commissionCurrency || lot.currency,
+  };
+}
+
+function closingTrade(get: (name: string) => string): IBClosingTrade | null {
+  if (!get('openCloseIndicator').includes('C')) {
+    return null;
+  }
+  return {
+    tradeId: get('tradeID'),
+    quantity: parseFloat(get('quantity') || '0'),
+    proceeds: parseFloat(get('proceeds') || '0'),
+    commission: parseFloat(get('ibCommission') || '0'),
+    commissionCurrency: get('ibCommissionCurrency'),
+    settleDate: formatDate(get('settleDateTarget')),
+  };
+}
+
+function lotTrade(get: (name: string) => string): IBTrade | null {
+  // Only closed lots have realized gains/losses.
+  if (get('openCloseIndicator') !== 'C') {
+    return null;
+  }
+  return {
+    symbol: get('symbol'),
+    description: get('description'),
+    quantity: parseFloat(get('quantity') || '0'),
+    tradePrice: parseFloat(get('tradePrice') || '0'),
+    tradeDate: formatDate(get('tradeDate')),
+    openDateTime: formatDateTime(get('openDateTime')),
+    reportDate: formatDate(get('reportDate')),
+    currency: get('currency') || 'USD',
+    cost: parseFloat(get('cost') || '0'),
+    fifoPnlRealized: parseFloat(get('fifoPnlRealized') || '0'),
+    assetCategory: get('assetCategory'),
+    subCategory: get('subCategory'),
+    multiplier: parseFloat(get('multiplier') || '1'),
+    isin: get('isin') || undefined,
+    settleDate: formatDate(get('settleDateTarget')) || undefined,
+  };
+}
+
+/**
+ * Lots in document order with their closing trade: a Lot follows its Trade, and carries the same
+ * tradeID when the report includes it.
+ */
+function collectLots(rows: { tag: 'Trade' | 'Lot'; get: (name: string) => string }[]): IBTrade[] {
+  const byId = new Map<string, IBClosingTrade>();
+  let last: IBClosingTrade | undefined;
+  const lots: IBTrade[] = [];
+  for (const row of rows) {
+    if (row.tag === 'Trade') {
+      last = closingTrade(row.get) ?? undefined;
+      if (last?.tradeId) {
+        byId.set(last.tradeId, last);
+      }
+      continue;
+    }
+    const lot = lotTrade(row.get);
+    if (lot) {
+      const id = row.get('tradeID');
+      lots.push(withClosingTrade(lot, (id && byId.get(id)) || last));
+    }
+  }
+  return lots;
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 export interface IBDividend {
@@ -31,6 +135,7 @@ export interface IBDividend {
   currency: string;
   assetCategory: string;
   subCategory: string;
+  isin?: string;
   source?: BrokerSource;
   sourceFile?: string;
 }
@@ -130,36 +235,13 @@ export function parseIBXML(xmlContent: string): ParsedIBData {
   const toDate = flexStatement.getAttribute('toDate') || '';
   const period = flexStatement.getAttribute('period') || '';
 
-  // Extract trades
-  const trades: IBTrade[] = [];
-  const lotElements = xmlDoc.querySelectorAll('Trades > Lot');
-
-  lotElements.forEach((lot) => {
-    const assetCategory = lot.getAttribute('assetCategory') || '';
-    const subCategory = lot.getAttribute('subCategory') || '';
-
-    // Only process closed lots (which have realized gains/losses)
-    const openCloseIndicator = lot.getAttribute('openCloseIndicator');
-    if (openCloseIndicator !== 'C') return;
-
-    const trade: IBTrade = {
-      symbol: lot.getAttribute('symbol') || '',
-      description: lot.getAttribute('description') || '',
-      quantity: parseFloat(lot.getAttribute('quantity') || '0'),
-      tradePrice: parseFloat(lot.getAttribute('tradePrice') || '0'),
-      tradeDate: formatDate(lot.getAttribute('tradeDate') || ''),
-      openDateTime: formatDateTime(lot.getAttribute('openDateTime') || ''),
-      reportDate: formatDate(lot.getAttribute('reportDate') || ''),
-      currency: lot.getAttribute('currency') || 'USD',
-      cost: parseFloat(lot.getAttribute('cost') || '0'),
-      fifoPnlRealized: parseFloat(lot.getAttribute('fifoPnlRealized') || '0'),
-      assetCategory,
-      subCategory,
-      multiplier: parseFloat(lot.getAttribute('multiplier') || '1'),
-    };
-
-    trades.push(trade);
-  });
+  // Extract closed lots with their closing trades
+  const trades = collectLots(
+    [...xmlDoc.querySelectorAll('Trades > Trade, Trades > Lot')].map((row) => ({
+      tag: row.tagName === 'Trade' ? ('Trade' as const) : ('Lot' as const),
+      get: (name: string) => row.getAttribute(name) || '',
+    })),
+  );
 
   // Extract dividends
   const dividends: IBDividend[] = [];
@@ -178,6 +260,7 @@ export function parseIBXML(xmlContent: string): ParsedIBData {
         currency: transaction.getAttribute('currency') || 'USD',
         assetCategory: transaction.getAttribute('assetCategory') || 'STK',
         subCategory: transaction.getAttribute('subCategory') || 'ETF',
+        isin: transaction.getAttribute('isin') || undefined,
       };
 
       dividends.push(dividend);
@@ -209,40 +292,15 @@ function parseIBXMLRegex(xmlContent: string): ParsedIBData {
   const toDate = formatDate(flexStatementMatch?.[3] || '');
   const period = flexStatementMatch?.[4] || '';
 
-  // Extract all Lot elements
-  const lotRegex = /<Lot[^>]*>/g;
-  const lots = xmlContent.match(lotRegex) || [];
-
-  const trades: IBTrade[] = [];
-
-  lots.forEach((lotTag) => {
-    // Check if it's a closed lot
-    const openCloseMatch = lotTag.match(/openCloseIndicator="([^"]*)"/);
-    if (openCloseMatch?.[1] !== 'C') return;
-
-    const getAttribute = (name: string): string => {
-      const match = lotTag.match(new RegExp(`${name}="([^"]*)"`, 'i'));
-      return match?.[1] || '';
+  // Extract closed lots with their closing trades, in document order
+  const rows = [...xmlContent.matchAll(/<(Trade|Lot)\s[^>]*>/g)].map((match) => {
+    const tag = match[0];
+    return {
+      tag: match[1] as 'Trade' | 'Lot',
+      get: (name: string) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1] || '',
     };
-
-    const trade: IBTrade = {
-      symbol: getAttribute('symbol'),
-      description: getAttribute('description'),
-      quantity: parseFloat(getAttribute('quantity') || '0'),
-      tradePrice: parseFloat(getAttribute('tradePrice') || '0'),
-      tradeDate: formatDate(getAttribute('tradeDate')),
-      openDateTime: formatDateTime(getAttribute('openDateTime')),
-      reportDate: formatDate(getAttribute('reportDate')),
-      currency: getAttribute('currency') || 'USD',
-      cost: parseFloat(getAttribute('cost') || '0'),
-      fifoPnlRealized: parseFloat(getAttribute('fifoPnlRealized') || '0'),
-      assetCategory: getAttribute('assetCategory'),
-      subCategory: getAttribute('subCategory'),
-      multiplier: parseFloat(getAttribute('multiplier') || '1'),
-    };
-
-    trades.push(trade);
   });
+  const trades = collectLots(rows);
 
   // Extract dividends
   const cashTransactionRegex = /<CashTransaction[^>]*>/g;
@@ -269,6 +327,7 @@ function parseIBXMLRegex(xmlContent: string): ParsedIBData {
           currency: getAttribute('currency') || 'USD',
           assetCategory: getAttribute('assetCategory') || 'STK',
           subCategory: getAttribute('subCategory') || 'ETF',
+          isin: getAttribute('isin') || undefined,
         };
 
         dividends.push(dividend);
@@ -400,11 +459,19 @@ export function convertToFormPosition(trade: IBTrade) {
   let purchasePrice: number;
   let salePrice: number;
 
+  let saleCommission = 0;
+
   if (assetType === 'stocks') {
-    // For stocks: cost is always positive (purchase cost)
-    // Sale price = cost + fifoPnlRealized (actual sale proceeds)
+    // Cost basis already includes the purchase commission, at the purchase date.
     purchasePrice = Math.abs(trade.cost);
-    salePrice = purchasePrice + trade.fifoPnlRealized;
+    if (hasGrossProceeds(trade)) {
+      // Column 4 is the gross sale proceeds; the sale commission goes to costs separately.
+      salePrice = trade.grossProceeds;
+      saleCommission = trade.saleCommission;
+    } else {
+      // Closed Lots only: proceeds net of the sale commission.
+      salePrice = purchasePrice + trade.fifoPnlRealized;
+    }
   } else if (assetType === 'options') {
     // For options with negative quantity (sold/written options):
     // - We sold the option first (received premium)
@@ -436,9 +503,11 @@ export function convertToFormPosition(trade: IBTrade) {
     assetType: assetType,
     assetDescription: `${trade.symbol} - ${trade.description} (${trade.assetCategory}${trade.subCategory ? `/${trade.subCategory}` : ''})`,
     symbol: trade.symbol,
+    isin: trade.isin,
     currency: trade.currency,
     purchaseDate: trade.quantity < 0 ? trade.tradeDate : trade.openDateTime,
     saleDate: trade.quantity < 0 ? trade.openDateTime : trade.tradeDate,
+    saleSettlementDate: trade.settleDate,
     purchasePriceForeign: purchasePrice.toFixed(2),
     salePriceForeign: salePrice.toFixed(2),
     purchaseRate: '',
@@ -446,9 +515,32 @@ export function convertToFormPosition(trade: IBTrade) {
     purchasePrice: '',
     salePrice: '',
     expenses: '0',
+    saleCommissionForeign: saleCommission ? saleCommission.toFixed(2) : undefined,
+    saleCommissionCurrency: saleCommission
+      ? trade.saleCommissionCurrency || trade.currency
+      : undefined,
     quantity: trade.quantity.toString(),
     multiplier: trade.multiplier.toString(),
+    broker: 'Interactive Brokers',
+    brokerJurisdiction: 'foreign' as const,
   };
+}
+
+/**
+ * Whether the lot has gross proceeds from its closing trade that agree with the lot's own
+ * cost + P&L (gross − commission ≈ cost + realized P&L), so they can replace the net figure.
+ */
+function hasGrossProceeds(
+  trade: IBTrade,
+): trade is IBTrade & { grossProceeds: number; saleCommission: number } {
+  if (trade.grossProceeds === undefined || trade.saleCommission === undefined) {
+    return false;
+  }
+  const net = Math.abs(trade.cost) + trade.fifoPnlRealized;
+  const sameCurrency =
+    !trade.saleCommissionCurrency || trade.saleCommissionCurrency === trade.currency;
+  const expectedNet = trade.grossProceeds - (sameCurrency ? trade.saleCommission : 0);
+  return Math.abs(expectedNet - net) <= Math.max(0.05, Math.abs(net) * 0.001);
 }
 
 /**
@@ -460,6 +552,9 @@ export function convertDividendToFormPosition(dividend: IBDividend) {
     assetType: 'dividends',
     assetDescription: `${dividend.symbol} - ${dividend.description}`,
     symbol: dividend.symbol,
+    isin: dividend.isin,
+    broker: 'Interactive Brokers',
+    brokerJurisdiction: 'foreign' as const,
     currency: dividend.currency,
     purchaseDate: '', // Not applicable for dividends
     saleDate: dividend.date, // Use dividend date as "sale" date
@@ -808,7 +903,12 @@ export interface FFMatchedPosition {
   buyPrice: number; // Total cost
   sellPrice: number; // Total proceeds
   profit: number;
+  /** Sale commission, pro rata to the matched quantity. */
   commission: number;
+  commissionCurrency: string;
+  /** Purchase commission of the matched buy, pro rata to the matched quantity. */
+  buyCommission: number;
+  buyCommissionCurrency: string;
   source: BrokerSource;
   sourceFile?: string;
 }
@@ -853,9 +953,10 @@ export function matchFFTradesFIFO(
         const totalSellProceeds = matchQty * sellPricePerUnit;
         const profit = totalSellProceeds - totalBuyCost;
 
-        // Proportional commission from sell trade
-        const commissionProportion = matchQty / sellTrade.quantity;
-        const commission = sellTrade.commission * commissionProportion;
+        // Commissions of both trades, pro rata to the matched quantity.
+        const commission = Math.abs(sellTrade.commission) * (matchQty / sellTrade.quantity);
+        const buyCommission =
+          Math.abs(firstBuy.trade.commission) * (matchQty / firstBuy.trade.quantity);
 
         matchedPositions.push({
           symbol: symbol,
@@ -869,6 +970,9 @@ export function matchFFTradesFIFO(
           sellPrice: totalSellProceeds,
           profit: profit,
           commission: commission,
+          commissionCurrency: sellTrade.commissionCurrency || sellTrade.currency,
+          buyCommission,
+          buyCommissionCurrency: firstBuy.trade.commissionCurrency || firstBuy.trade.currency,
           source: 'freedom_finance',
           sourceFile: sourceFileName,
         });
@@ -919,6 +1023,7 @@ export function convertFFToFormPosition(position: FFMatchedPosition, sourceFileN
     assetType: assetType,
     assetDescription: `${position.symbol} - ${position.instrKind} (ISIN: ${position.isin})`,
     symbol: position.symbol,
+    isin: position.isin || undefined,
     currency: position.currency,
     purchaseDate: position.buyDate,
     saleDate: position.sellDate,
@@ -928,7 +1033,14 @@ export function convertFFToFormPosition(position: FFMatchedPosition, sourceFileN
     saleRate: '',
     purchasePrice: '',
     salePrice: '',
-    expenses: position.commission.toFixed(2),
+    // Commissions are converted to UAH at the rate of their own currency and date on import.
+    expenses: '0',
+    purchaseCommissionForeign: position.buyCommission
+      ? position.buyCommission.toFixed(2)
+      : undefined,
+    purchaseCommissionCurrency: position.buyCommission ? position.buyCommissionCurrency : undefined,
+    saleCommissionForeign: position.commission ? position.commission.toFixed(2) : undefined,
+    saleCommissionCurrency: position.commission ? position.commissionCurrency : undefined,
     quantity: position.quantity.toString(),
     multiplier: '1',
     source: 'freedom_finance' as BrokerSource,
@@ -947,6 +1059,7 @@ export function convertFFDividendToFormPosition(dividend: FFDividend, sourceFile
     assetType: 'dividends',
     assetDescription: `${dividend.symbol} - Дивіденди (ISIN: ${dividend.isin})`,
     symbol: dividend.symbol,
+    isin: dividend.isin || undefined,
     currency: dividend.currency,
     purchaseDate: '', // Not applicable for dividends
     saleDate: dividend.date, // Use payment date as "sale" date for tax purposes
@@ -976,8 +1089,13 @@ export function parseAnyBrokerXML(
   sourceFileName?: string,
   reportYear?: number,
 ): {
-  positions: ReturnType<typeof convertToFormPosition>[];
+  positions: FinancialPosition[];
   source: BrokerSource;
+  /**
+   * Freedom Finance only: which legal entity issued the report, if the report says. `null` means
+   * the user has to be asked (Europe — foreign broker, Ukraine — Ukrainian tax agent).
+   */
+  freedomEntity?: FreedomEntity | null;
   summary: {
     trades: number;
     dividends: number;
@@ -1027,6 +1145,15 @@ export function parseAnyBrokerXML(
     }));
 
     const totals = calculateTradeTotals(filteredTrades);
+    const netLots = filteredTrades.filter(
+      (t) =>
+        determineAssetType(t.assetCategory, t.subCategory) === 'stocks' && !hasGrossProceeds(t),
+    ).length;
+    if (netLots > 0) {
+      warnings.push(
+        `IB: для ${netLots} лотів у звіті немає рядків угод (Trades → Execution), тому виручку взято за вирахуванням комісії продажу. Додайте Execution у Flex Query, щоб графа 4 Ф1 містила брутто-виручку.`,
+      );
+    }
 
     return {
       positions: [...tradePositions, ...dividendPositions],
@@ -1079,8 +1206,9 @@ export function parseAnyBrokerXML(
       );
     }
 
+    const freedomEntity = detectFreedomEntity(xmlContent);
     const formPositions = matchedPositions.map((pos) =>
-      convertFFToFormPosition(pos, sourceFileName),
+      withFreedomEntity(convertFFToFormPosition(pos, sourceFileName), freedomEntity),
     );
 
     // Filter and process dividends
@@ -1100,7 +1228,7 @@ export function parseAnyBrokerXML(
     }
 
     const dividendPositions = filteredDividends.map((dividend) =>
-      convertFFDividendToFormPosition(dividend, sourceFileName),
+      withFreedomEntity(convertFFDividendToFormPosition(dividend, sourceFileName), freedomEntity),
     );
 
     const totalProfit = matchedPositions.reduce((sum, pos) => sum + pos.profit, 0);
@@ -1109,6 +1237,7 @@ export function parseAnyBrokerXML(
     return {
       positions: [...formPositions, ...dividendPositions],
       source: 'freedom_finance',
+      freedomEntity,
       summary: {
         trades: matchedPositions.length,
         dividends: filteredDividends.length,
@@ -1122,6 +1251,48 @@ export function parseAnyBrokerXML(
   throw new Error(
     'Unknown XML format. Supported formats: Interactive Brokers FlexQuery, Freedom Finance',
   );
+}
+
+/** Legal entity behind a Freedom Finance report. */
+export type FreedomEntity = 'europe' | 'ukraine';
+
+export const FREEDOM_ENTITY = {
+  europe: { broker: 'Freedom Finance Europe', jurisdiction: 'foreign' },
+  ukraine: { broker: 'Фрідом Фінанс Україна', jurisdiction: 'ua' },
+} as const;
+
+/**
+ * Freedom Finance Europe (Cyprus) is a foreign broker; Фрідом Фінанс Україна trades on a Ukrainian
+ * exchange and withholds tax as an agent. `null` when the report does not name the entity.
+ */
+export function detectFreedomEntity(xmlContent: string): FreedomEntity | null {
+  if (
+    /Freedom\s*Finance\s*Europe|Фрідом\s*Фінанс\s*Європа|Фридом\s*Финанс\s*Европа|Cyprus|Кіпр|Кипр/i.test(
+      xmlContent,
+    )
+  ) {
+    return 'europe';
+  }
+  if (
+    /Freedom\s*Finance\s*Ukraine|Фрідом\s*Фінанс\s*Україна|Фридом\s*Финанс\s*Украина/i.test(
+      xmlContent,
+    )
+  ) {
+    return 'ukraine';
+  }
+  return null;
+}
+
+/** Set broker name and jurisdiction of Freedom Finance positions once the entity is known. */
+export function withFreedomEntity<T extends object>(
+  position: T,
+  entity: FreedomEntity | null,
+): T & { broker?: string; brokerJurisdiction?: BrokerJurisdiction } {
+  if (!entity) {
+    return position;
+  }
+  const { broker, jurisdiction } = FREEDOM_ENTITY[entity];
+  return { ...position, broker, brokerJurisdiction: jurisdiction };
 }
 
 /**

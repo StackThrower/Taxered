@@ -22,6 +22,7 @@ import {
   formatExchangeRate,
   getCurrencySymbol,
 } from '../../lib/nbu-exchange-rates';
+import { applyNbuRates } from '../../lib/position-rates';
 import { Icon } from '../../shared/icon';
 import {
   ASSET_TYPES,
@@ -69,6 +70,11 @@ function positionGroup(p: FinancialPosition): PositionGroup {
     broker: control(p.broker),
     brokerJurisdiction: control<BrokerJurisdiction | undefined>(p.brokerJurisdiction),
     assetCode: control(p.assetCode),
+    saleSettlementDate: control(p.saleSettlementDate),
+    purchaseCommissionForeign: control(p.purchaseCommissionForeign),
+    purchaseCommissionCurrency: control(p.purchaseCommissionCurrency),
+    saleCommissionForeign: control(p.saleCommissionForeign),
+    saleCommissionCurrency: control(p.saleCommissionCurrency),
   });
 }
 
@@ -332,7 +338,8 @@ export class FormF0121214 {
     this.importStatus.set('Читання файлів...');
 
     try {
-      const { parseAnyBrokerXML, readFileAsText } = await import('../../lib/ib-xml-parser');
+      const { parseAnyBrokerXML, readFileAsText, withFreedomEntity } =
+        await import('../../lib/ib-xml-parser');
 
       const imported: FinancialPosition[] = [];
       const summaries: {
@@ -362,7 +369,17 @@ export class FormF0121214 {
           continue;
         }
 
-        imported.push(...(result.positions as FinancialPosition[]));
+        let positions = result.positions;
+        if (result.source === 'freedom_finance' && result.freedomEntity === null) {
+          // The report does not name the entity: its jurisdiction decides the Ф1 code.
+          const europe = window.confirm(
+            `${file.name}: зі звіту не видно, яка компанія Freedom Finance його видала.\n\n` +
+              'OK — Freedom Finance Europe (Кіпр, іноземний брокер, код 4 у Ф1).\n' +
+              'Скасувати — Фрідом Фінанс Україна (український брокер — податковий агент, код 2).',
+          );
+          positions = positions.map((p) => withFreedomEntity(p, europe ? 'europe' : 'ukraine'));
+        }
+        imported.push(...positions);
         summaries.push({
           source:
             result.source === 'interactive_brokers' ? 'Interactive Brokers' : 'Freedom Finance',
@@ -396,7 +413,7 @@ export class FormF0121214 {
 
         if (position.currency !== 'UAH' && position.saleDate) {
           try {
-            updated[i] = await withNbuRates(position);
+            updated[i] = await applyNbuRates(position, fetchNBUExchangeRate);
           } catch (error) {
             console.error(`Error fetching rates for position ${position.id}:`, error);
           }
@@ -594,37 +611,4 @@ export class FormF0121214 {
       multiplier: '1',
     };
   }
-}
-
-/**
- * Fetch NBU rates for an imported position and convert its amounts to UAH.
- * Dividends only need the payment-date rate.
- */
-async function withNbuRates(position: FinancialPosition): Promise<FinancialPosition> {
-  let result = position;
-
-  if (position.assetType !== 'dividends' && position.purchaseDate) {
-    const purchaseRate = await fetchNBUExchangeRate(position.purchaseDate, position.currency);
-    if (purchaseRate !== null) {
-      result = {
-        ...result,
-        purchaseRate: purchaseRate.toFixed(4),
-        purchasePrice: convertToUAH(
-          parseFloat(position.purchasePriceForeign) || 0,
-          purchaseRate,
-        ).toFixed(2),
-      };
-    }
-  }
-
-  const saleRate = await fetchNBUExchangeRate(position.saleDate, position.currency);
-  if (saleRate !== null) {
-    result = {
-      ...result,
-      saleRate: saleRate.toFixed(4),
-      salePrice: convertToUAH(parseFloat(position.salePriceForeign) || 0, saleRate).toFixed(2),
-    };
-  }
-
-  return result;
 }

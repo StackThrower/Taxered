@@ -50,6 +50,16 @@ export interface FinancialPosition {
   brokerJurisdiction?: BrokerJurisdiction;
   /** Manual Ф1 column 2 code "1"–"4"; empty = automatic. */
   assetCode?: string;
+  /** Settlement date of the sale (open question 1: the sale rate is taken on `saleDate`). */
+  saleSettlementDate?: string;
+  /**
+   * Broker commissions in their own currency. On import they are converted to UAH at the NBU
+   * rate of their currency on the purchase / sale date and added to `expenses`.
+   */
+  purchaseCommissionForeign?: string;
+  purchaseCommissionCurrency?: string;
+  saleCommissionForeign?: string;
+  saleCommissionCurrency?: string;
 }
 
 export type BrokerJurisdiction = '' | 'foreign' | 'ua';
