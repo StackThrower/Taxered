@@ -233,7 +233,7 @@ const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
 export class WorldMap {
   readonly view = input.required<MapView>();
   readonly metric = input.required<Metric>();
-  readonly selected = input.required<string>();
+  readonly selected = input.required<string | null>();
   readonly label = input.required<string>();
   readonly selectedChange = output<string>();
 

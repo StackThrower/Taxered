@@ -112,91 +112,76 @@
         </div>
       </div>
 
-      @let c = selected();
       <aside class="card" aria-labelledby="tax-map-detail">
-        <div class="card-header">
-          <h2
-            #detailHeading
-            id="tax-map-detail"
-            tabindex="-1"
-            class="card-title flex scroll-mt-24 items-center gap-2 text-xl outline-none"
-          >
-            <span aria-hidden="true">{{ flagOf(c.code) }}</span>
-            {{ c.name }}
-          </h2>
-          <p class="card-description">
-            {{ s.regions[c.region] }}
-            @if (c.code === baseline.code) {
-              · {{ s.baseline }}
-            }
-          </p>
-        </div>
-        <div class="card-content space-y-5">
-          <p class="sr-only" aria-live="polite">{{ liveSummary() }}</p>
-
-          <ul class="space-y-4">
-            @for (row of comparison(); track row.metric) {
-              <li>
-                <div class="flex items-baseline justify-between gap-2">
-                  <span class="text-sm font-medium">{{ row.label }}</span>
-                  <span class="text-lg font-semibold tabular-nums">{{ formatRate(row.rate) }}</span>
-                </div>
-                <div aria-hidden="true" class="mt-1.5 space-y-1">
-                  <div class="h-2 overflow-hidden rounded-full bg-muted">
+        @if (selected(); as c) {
+          <div class="card-header">
+            <h2
+              #detailHeading
+              id="tax-map-detail"
+              tabindex="-1"
+              class="card-title flex scroll-mt-24 items-center gap-2 text-xl outline-none"
+            >
+              <span aria-hidden="true">{{ flagOf(c.code) }}</span>
+              {{ c.name }}
+            </h2>
+            <p class="card-description">{{ s.regions[c.region] }}</p>
+          </div>
+          <div class="card-content space-y-5">
+            <ul class="space-y-4">
+              @for (row of rows(); track row.metric) {
+                <li>
+                  <div class="flex items-baseline justify-between gap-2">
+                    <span class="text-sm font-medium">{{ row.label }}</span>
+                    <span class="text-lg font-semibold tabular-nums">{{
+                      formatRate(row.rate)
+                    }}</span>
+                  </div>
+                  <div aria-hidden="true" class="mt-1.5 h-2 overflow-hidden rounded-full bg-muted">
                     <div
                       class="h-full rounded-full"
                       [style.width.%]="row.width * 100"
                       [style.background]="row.bin.bg"
                     ></div>
                   </div>
-                  @if (c.code !== baseline.code) {
-                    <div class="h-2 overflow-hidden rounded-full bg-muted">
-                      <div
-                        class="h-full rounded-full bg-muted-foreground/60"
-                        [style.width.%]="row.baseWidth * 100"
-                      ></div>
-                    </div>
-                  }
-                </div>
-                <p class="mt-1.5 text-xs text-muted-foreground">
-                  {{ s.tax }}: <span class="tabular-nums">{{ row.tax }}</span>
-                  @if (c.code !== baseline.code) {
-                    · {{ baseline.name }} {{ formatRate(row.base) }}:
-                    <span
-                      class="font-medium tabular-nums"
-                      [class]="row.better ? 'text-primary' : row.worse ? 'text-destructive' : ''"
-                      >{{ row.diff }}</span
-                    >
-                  }
-                </p>
-              </li>
-            }
-          </ul>
-
-          @if (c.code !== baseline.code) {
-            <p class="text-xs text-muted-foreground">
-              {{ barsHint() }}
-            </p>
-          }
-
-          @if (c.regime) {
-            <div class="rounded-lg border border-primary/40 bg-primary/5 p-3">
-              <h3 class="text-sm font-semibold">
-                <span aria-hidden="true">★</span> {{ s.regime }}
-              </h3>
-              <p class="mt-1 text-sm">{{ c.regime }}</p>
-            </div>
-          }
-
-          <div>
-            <h3 class="text-sm font-semibold">{{ s.notes }}</h3>
-            <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
-              @for (note of c.notes; track note) {
-                <li>{{ note }}</li>
+                  <p class="mt-1.5 text-xs text-muted-foreground">
+                    {{ s.tax }}: <span class="tabular-nums">{{ row.tax }}</span>
+                  </p>
+                </li>
               }
             </ul>
+
+            @if (c.regime) {
+              <div class="rounded-lg border border-primary/40 bg-primary/5 p-3">
+                <h3 class="text-sm font-semibold">
+                  <span aria-hidden="true">★</span> {{ s.regime }}
+                </h3>
+                <p class="mt-1 text-sm">{{ c.regime }}</p>
+              </div>
+            }
+
+            <div>
+              <h3 class="text-sm font-semibold">{{ s.notes }}</h3>
+              <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm text-muted-foreground">
+                @for (note of c.notes; track note) {
+                  <li>{{ note }}</li>
+                }
+              </ul>
+            </div>
           </div>
-        </div>
+        } @else {
+          <div class="card-header">
+            <h2
+              #detailHeading
+              id="tax-map-detail"
+              tabindex="-1"
+              class="card-title scroll-mt-24 text-xl outline-none"
+            >
+              {{ s.emptyTitle }}
+            </h2>
+            <p class="card-description">{{ s.emptyText }}</p>
+          </div>
+        }
+        <p class="sr-only" aria-live="polite">{{ liveSummary() }}</p>
       </aside>
     </div>
 
@@ -250,9 +235,6 @@
                   </button>
                   @if (row.regime) {
                     <span class="sr-only">, {{ s.regimeMark }}</span>
-                  }
-                  @if (row.code === baseline.code) {
-                    <span class="badge ml-2">{{ s.baseline }}</span>
                   }
                 </th>
                 @for (m of metrics; track m) {

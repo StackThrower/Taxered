@@ -1,5 +1,4 @@
 import {
-  BASELINE_CODE,
   COUNTRIES,
   METRICS,
   REGIONS,
@@ -35,8 +34,8 @@ describe('tax map data', () => {
     }
   });
 
-  it('includes Ukraine as the baseline at 18% + 5%', () => {
-    expect(getCountry(BASELINE_CODE)?.rates).toEqual({
+  it('taxes Ukrainian investment income at 18% + 5%', () => {
+    expect(getCountry('UA')?.rates).toEqual({
       dividends: 23,
       capitalGains: 23,
       interest: 23,

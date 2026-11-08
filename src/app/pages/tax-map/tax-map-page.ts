@@ -2,6 +2,8 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   signal,
@@ -16,9 +18,7 @@ import { SITE_URL, localePath } from '../../core/site';
 import { Icon } from '../../shared/icon';
 import { MapView, WorldMap } from './world-map';
 import {
-  BASELINE_CODE,
   COUNTRIES,
-  CountryTax,
   DATA_UPDATED,
   METRICS,
   Metric,
@@ -32,8 +32,7 @@ import {
 } from './tax-data';
 
 const s = UK.taxMap;
-const BASELINE = getCountry(BASELINE_CODE)!;
-/** Rates are drawn on a 0–55% scale in the comparison bars. */
+/** Rates are drawn on a 0–55% scale in the bars. */
 const BAR_MAX = 55;
 
 const usd = new Intl.NumberFormat('uk-UA', {
@@ -54,14 +53,13 @@ export class TaxMapPage {
   protected readonly regions: readonly MapView[] = ['world', ...REGIONS];
   protected readonly metrics = METRICS;
   protected readonly bins = RATE_BINS;
-  protected readonly baseline = BASELINE;
   protected readonly flagOf = flagOf;
   protected readonly formatRate = formatRate;
   protected readonly disclaimer = s.disclaimer.map((line) => line.replace('{date}', DATA_UPDATED));
 
   protected readonly region = signal<MapView>('europe');
   protected readonly metric = signal<Metric>('dividends');
-  protected readonly selectedCode = signal(BASELINE_CODE);
+  protected readonly selectedCode = signal<string | null>(null);
 
   protected readonly amountControl = new FormControl('10000', { nonNullable: true });
   private readonly amountValue = toSignal(this.amountControl.valueChanges, {
@@ -72,6 +70,7 @@ export class TaxMapPage {
     return Number.isFinite(value) && value > 0 ? value : 0;
   });
 
+  private readonly injector = inject(Injector);
   private readonly detailHeading = viewChild.required<ElementRef<HTMLElement>>('detailHeading');
 
   protected readonly countries = computed(() => {
@@ -85,41 +84,32 @@ export class TaxMapPage {
       .replace('{metric}', s.metrics[this.metric()]),
   );
 
-  protected readonly selected = computed(() => getCountry(this.selectedCode()) ?? BASELINE);
+  protected readonly selected = computed(() => getCountry(this.selectedCode() ?? ''));
 
-  protected readonly comparison = computed(() => {
+  protected readonly rows = computed(() => {
     const country = this.selected();
     const amount = this.amount();
-    return METRICS.map((metric) => {
-      const rate = country.rates[metric];
-      const base = BASELINE.rates[metric];
-      const diffTax = (amount * (rate - base)) / 100;
-      return {
-        metric,
-        label: s.metrics[metric],
-        rate,
-        base,
-        bin: rateBin(rate),
-        width: Math.min(rate, BAR_MAX) / BAR_MAX,
-        baseWidth: Math.min(base, BAR_MAX) / BAR_MAX,
-        tax: usd.format((amount * rate) / 100),
-        diff:
-          rate === base
-            ? s.same
-            : `${usd.format(Math.abs(diffTax))} ${rate < base ? s.cheaper : s.pricier}`,
-        better: rate < base,
-        worse: rate > base,
-      };
-    });
+    return country
+      ? METRICS.map((metric) => {
+          const rate = country.rates[metric];
+          return {
+            metric,
+            label: s.metrics[metric],
+            rate,
+            bin: rateBin(rate),
+            width: Math.min(rate, BAR_MAX) / BAR_MAX,
+            tax: usd.format((amount * rate) / 100),
+          };
+        })
+      : [];
   });
-
-  protected readonly barsHint = computed(() =>
-    s.barsHint.replace('{country}', this.selected().name).replace('{baseline}', BASELINE.name),
-  );
 
   /** Announced to screen readers when another country is selected. */
   protected readonly liveSummary = computed(() => {
     const country = this.selected();
+    if (!country) {
+      return '';
+    }
     const rates = METRICS.map((m) => `${s.metrics[m]} ${formatRate(country.rates[m])}`);
     return `${country.name}: ${rates.join(', ')}`;
   });
@@ -148,9 +138,15 @@ export class TaxMapPage {
   /** From the ranking table: select and move focus to the details so the change is noticed. */
   protected selectAndShow(code: string): void {
     this.selectedCode.set(code);
-    const heading = this.detailHeading().nativeElement;
-    heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    heading.focus({ preventScroll: true });
+    // The heading is re-rendered for the new country, so wait for it.
+    afterNextRender(
+      () => {
+        const heading = this.detailHeading().nativeElement;
+        heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        heading.focus({ preventScroll: true });
+      },
+      { injector: this.injector },
+    );
   }
 
   protected binFor(rate: number) {
@@ -161,13 +157,12 @@ export class TaxMapPage {
     const path = localePath('tax-map');
     const url = `${SITE_URL}${path}`;
     inject(SeoService).setPage({
-      title: `Податки на інвестиції у світі ${new Date().getFullYear()}: карта для релокації`,
-      description: `Інтерактивна карта податків на дивіденди, приріст капіталу та відсотки у ${COUNTRIES.length} країнах Європи, Азії та Америки. Порівняння з Україною та пільгові режими для нових резидентів.`,
+      title: `Карта податків на інвестиції у світі ${new Date().getFullYear()}`,
+      description: `Інтерактивна карта податків на дивіденди, приріст капіталу та відсотки у ${COUNTRIES.length} країнах Європи, Азії та Америки: ставки, особливості та пільгові режими.`,
       keywords: [
         'податки на інвестиції',
         'податок на дивіденди',
         'податок на приріст капіталу',
-        'релокація інвестора',
         'країни без податків',
         'non-dom',
         'податкове резидентство',

@@ -1,6 +1,6 @@
 /**
  * Generates `src/app/pages/tax-map/world-shapes.ts`: projected SVG paths of the countries on
- * the relocation tax map, one merged background path for every other country, and view boxes
+ * the investment tax map, one merged background path for every other country, and view boxes
  * for the region views. Run with `npm run world-map` after changing the country list.
  *
  * Source: Natural Earth 1:50m via `world-atlas`. Natural Earth draws Crimea as part of

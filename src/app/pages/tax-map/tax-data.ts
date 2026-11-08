@@ -1,8 +1,7 @@
 /**
  * Simplified tax rates on investment income for individual tax residents, used by the
- * relocation map. Each rate is the top / typical headline rate on foreign-source income
- * (an IBKR-style brokerage account) for someone who has just moved to the country:
- * no treaty relief, allowances or thresholds. Special opt-in regimes for newcomers are
+ * tax map. Each rate is the top / typical headline rate on foreign-source income
+ * (an IBKR-style brokerage account): no treaty relief, allowances or thresholds. Special opt-in regimes for newcomers are
  * described in `regime` and are not reflected in the rates.
  */
 
@@ -26,9 +25,6 @@ export const DATA_UPDATED = 'початок 2026 року';
 export const METRICS: readonly Metric[] = ['dividends', 'capitalGains', 'interest'];
 
 export const REGIONS: readonly Region[] = ['europe', 'asia', 'americas'];
-
-/** Ukraine is the baseline every country is compared with. */
-export const BASELINE_CODE = 'UA';
 
 export const COUNTRIES: readonly CountryTax[] = [
   // ── Europe ────────────────────────────────────────────────────────────────
