@@ -1,5 +1,6 @@
 import type { FinancialPosition } from '../../declaration/f0121214/tax-model';
 import { encodeWindows1251 } from './encoding';
+import { applyNbuRates, type RateSource } from '../position-rates';
 import { buildDeclarationPackage, type PackageInput } from './package';
 import { expectValid } from './testing/xsd';
 
@@ -172,12 +173,30 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('accepts a passport or an ID-card number instead of the RNOKPP', () => {
-    for (const taxNumber of ['кв 123456', '123456789']) {
-      const file = f1File([position({ salePrice: '10000' })], {
+    const cases = [
+      ['кв 123456', 'КВ123456', '00КВ123456'],
+      ['123456789', '123456789', '0123456789'],
+    ];
+    for (const [taxNumber, tin, inFileName] of cases) {
+      const { files } = build([position({ salePrice: '10000' })], {
         taxpayer: { ...base.taxpayer, taxNumber },
       });
-      expectValid(file);
+      for (const file of files) {
+        expect(file.xml).toContain(`<TIN>${tin}</TIN>`);
+        expect(file.xml).toContain(`<HTIN>${tin}</HTIN>`);
+        expect(file.name.slice(4, 14)).toBe(inFileName);
+        expectValid(file);
+      }
+      expect(files[0].xml).toContain(`<FILENAME>${files[1].name}</FILENAME>`);
     }
+  });
+
+  it('keeps long descriptions whole: T1RXXXXG3S has no maxLength', () => {
+    const description = 'Опис '.repeat(1000);
+    const file = f1File([position({ salePrice: '10000', assetDescription: description })]);
+
+    expect(file.xml).toContain(description.trim());
+    expectValid(file);
   });
 
   it('escapes XML special characters and warns about characters outside windows-1251', () => {
@@ -421,5 +440,75 @@ describe('buildDeclarationPackage: return types', () => {
     expect(elapsed).toBeLessThan(1000);
     expect(files[1].xml).toContain('<T1RXXXXG2 ROWNUM="1000">');
     files.forEach(expectValid);
+  });
+});
+
+describe('buildDeclarationPackage: end to end', () => {
+  /** Made-up NBU rates of the spec's reference example. */
+  const rates: Record<string, number> = {
+    '2025-01-10': 42,
+    '2025-06-20': 41.5,
+    '2025-02-03': 41.2,
+    '2025-09-15': 41.9,
+    '2025-03-15': 41.8,
+  };
+  const mockNbu: RateSource = async (date, currency) =>
+    currency === 'USD' ? (rates[date] ?? null) : null;
+
+  const lot = (symbol: string, buy: [string, string], sell: [string, string], qty: string) =>
+    position({
+      symbol,
+      quantity: qty,
+      purchaseDate: buy[0],
+      saleDate: sell[0],
+      purchasePriceForeign: buy[1],
+      salePriceForeign: sell[1],
+      purchaseRate: '',
+      saleRate: '',
+      purchasePrice: '',
+      salePrice: '',
+      expenses: '0',
+      purchaseCommissionForeign: '1',
+      saleCommissionForeign: '1',
+      source: 'interactive_brokers',
+      brokerJurisdiction: 'foreign',
+    });
+
+  it('turns broker amounts and mocked NBU rates into the reference figures', async () => {
+    const raw = [
+      lot('AAPL', ['2025-01-10', '1500'], ['2025-06-20', '2000'], '10'),
+      lot('MSFT', ['2025-02-03', '2100'], ['2025-09-15', '1900'], '5'),
+      position({
+        assetType: 'dividends',
+        isin: 'US0378331005',
+        purchaseDate: '',
+        saleDate: '2025-03-15',
+        salePriceForeign: '100',
+        saleRate: '',
+        salePrice: '',
+      }),
+    ];
+    const positions = await Promise.all(raw.map((p) => applyNbuRates(p, mockNbu)));
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const result = build(positions, { options: { previousYearsLoss: '3000' } });
+
+    // Building the package makes no network requests: personal data stays in the browser.
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+
+    const [declaration, f1] = result.files;
+    expect(f1.xml).toContain('<T1RXXXXG4 ROWNUM="1">83000.00</T1RXXXXG4>');
+    expect(f1.xml).toContain('<T1RXXXXG5 ROWNUM="1">63083.50</T1RXXXXG5>');
+    expect(f1.xml).toContain('<T1RXXXXG6 ROWNUM="2">-6993.10</T1RXXXXG6>');
+    expect(f1.xml).toContain('<R001G4>162610.00</R001G4><R001G5>149686.60</R001G5>');
+    expect(f1.xml).toContain('<R042G6>1786.21</R042G6>');
+    expect(f1.xml).toContain('<R052G6>496.17</R052G6>');
+    expect(declaration.xml).toContain(
+      '<R010G3>14103.40</R010G3><R010G6>2162.41</R010G6><R010G7>705.17</R010G7>',
+    );
+    expect(declaration.xml).toContain('<R013G3>2162.41</R013G3>');
+    expectValid(declaration);
+    expectValid(f1);
   });
 });
