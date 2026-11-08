@@ -14,9 +14,6 @@ export interface CountryTax {
   code: string;
   name: string;
   region: Region;
-  /** Tile position on the region's grid map (1-based). */
-  col: number;
-  row: number;
   rates: Record<Metric, number>;
   /** Opt-in regime for new residents that can lower the tax (non-dom, flat tax, holiday…). */
   regime?: string;
@@ -39,8 +36,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'IS',
     name: 'Ісландія',
     region: 'europe',
-    col: 1,
-    row: 1,
     rates: { dividends: 22, capitalGains: 22, interest: 22 },
     notes: ['Єдина ставка 22% на дохід від капіталу.'],
   },
@@ -48,8 +43,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'NO',
     name: 'Норвегія',
     region: 'europe',
-    col: 5,
-    row: 1,
     rates: { dividends: 37.84, capitalGains: 37.84, interest: 22 },
     notes: [
       'Дивіденди та прибуток з акцій множаться на 1,72 і оподатковуються за 22% — фактично 37,84%.',
@@ -60,8 +53,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'SE',
     name: 'Швеція',
     region: 'europe',
-    col: 6,
-    row: 1,
     rates: { dividends: 30, capitalGains: 30, interest: 30 },
     notes: [
       '30% на дохід від капіталу.',
@@ -72,8 +63,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'FI',
     name: 'Фінляндія',
     region: 'europe',
-    col: 7,
-    row: 1,
     rates: { dividends: 28.9, capitalGains: 34, interest: 34 },
     notes: [
       '30% до 30 тис. € доходу від капіталу, 34% — понад.',
@@ -84,8 +73,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'IE',
     name: 'Ірландія',
     region: 'europe',
-    col: 2,
-    row: 2,
     rates: { dividends: 52, capitalGains: 33, interest: 52 },
     regime:
       'Remittance basis для non-domiciled: іноземний дохід оподатковується лише при переказі в Ірландію.',
@@ -98,8 +85,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'GB',
     name: 'Велика Британія',
     region: 'europe',
-    col: 3,
-    row: 2,
     rates: { dividends: 39.35, capitalGains: 24, interest: 45 },
     regime:
       'FIG regime: перші 4 роки після переїзду іноземні доходи та прирости не оподатковуються (якщо не були резидентом 10 років).',
@@ -112,8 +97,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'DK',
     name: 'Данія',
     region: 'europe',
-    col: 5,
-    row: 2,
     rates: { dividends: 42, capitalGains: 42, interest: 42 },
     notes: [
       'Дохід з акцій: 27% до порогу (~79 тис. DKK), 42% понад.',
@@ -124,8 +107,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'EE',
     name: 'Естонія',
     region: 'europe',
-    col: 7,
-    row: 2,
     rates: { dividends: 22, capitalGains: 22, interest: 22 },
     notes: [
       'Єдина ставка 22%.',
@@ -136,8 +117,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'NL',
     name: 'Нідерланди',
     region: 'europe',
-    col: 4,
-    row: 3,
     rates: { dividends: 36, capitalGains: 36, interest: 36 },
     notes: [
       'Box 3: 36% від умовної дохідності, а не від фактичного доходу — фактично ≈2% від вартості активів на рік.',
@@ -148,8 +127,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'DE',
     name: 'Німеччина',
     region: 'europe',
-    col: 5,
-    row: 3,
     rates: { dividends: 26.38, capitalGains: 26.38, interest: 26.38 },
     notes: [
       'Abgeltungsteuer 25% + солідарний збір 5,5% = 26,375% (+ церковний податок за наявності).',
@@ -160,8 +137,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'PL',
     name: 'Польща',
     region: 'europe',
-    col: 6,
-    row: 3,
     rates: { dividends: 19, capitalGains: 19, interest: 19 },
     notes: [
       'Податок Белки — 19% на всі інвестиційні доходи.',
@@ -172,8 +147,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'LV',
     name: 'Латвія',
     region: 'europe',
-    col: 7,
-    row: 3,
     rates: { dividends: 20, capitalGains: 25.5, interest: 25.5 },
     notes: [
       'Дохід від капіталу — 25,5%, дивіденди — 20%.',
@@ -184,8 +157,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'BE',
     name: 'Бельгія',
     region: 'europe',
-    col: 3,
-    row: 4,
     rates: { dividends: 30, capitalGains: 10, interest: 30 },
     notes: [
       'Дивіденди й відсотки — 30%, з невеликими щорічними пільгами.',
@@ -197,8 +168,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'LU',
     name: 'Люксембург',
     region: 'europe',
-    col: 4,
-    row: 4,
     rates: { dividends: 22.89, capitalGains: 0, interest: 20 },
     notes: [
       'Оподатковується 50% дивідендів за прогресивною шкалою — фактично до ≈22,9%.',
@@ -209,8 +178,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CZ',
     name: 'Чехія',
     region: 'europe',
-    col: 5,
-    row: 4,
     rates: { dividends: 15, capitalGains: 15, interest: 15 },
     notes: [
       '15%, понад поріг (~1,7 млн CZK) — 23%.',
@@ -221,8 +188,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'SK',
     name: 'Словаччина',
     region: 'europe',
-    col: 6,
-    row: 4,
     rates: { dividends: 10, capitalGains: 19, interest: 19 },
     notes: [
       'Дивіденди — 10%, інший дохід від капіталу — 19/25%.',
@@ -233,8 +198,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'LT',
     name: 'Литва',
     region: 'europe',
-    col: 7,
-    row: 4,
     rates: { dividends: 15, capitalGains: 15, interest: 15 },
     notes: [
       '15% до порогу (120 середніх зарплат), 20% понад.',
@@ -245,8 +208,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'FR',
     name: 'Франція',
     region: 'europe',
-    col: 3,
-    row: 5,
     rates: { dividends: 30, capitalGains: 30, interest: 30 },
     regime:
       'Імпатріанти: 50% іноземних дивідендів і відсотків звільнено на 8 років (за умови роботи у Франції).',
@@ -259,8 +220,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CH',
     name: 'Швейцарія',
     region: 'europe',
-    col: 4,
-    row: 5,
     rates: { dividends: 40, capitalGains: 0, interest: 40 },
     regime: 'Паушальне оподаткування (lump-sum) за витратами — для тих, хто не працює в Швейцарії.',
     notes: [
@@ -273,8 +232,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'AT',
     name: 'Австрія',
     region: 'europe',
-    col: 5,
-    row: 5,
     rates: { dividends: 27.5, capitalGains: 27.5, interest: 27.5 },
     notes: ['KESt 27,5% на всі інвестиційні доходи; відсотки за банківськими вкладами — 25%.'],
   },
@@ -282,8 +239,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'HU',
     name: 'Угорщина',
     region: 'europe',
-    col: 6,
-    row: 5,
     rates: { dividends: 28, capitalGains: 28, interest: 28 },
     notes: [
       '15% ПДФО + 13% соціального внеску (szocho) до річного ліміту.',
@@ -294,8 +249,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'UA',
     name: 'Україна',
     region: 'europe',
-    col: 7,
-    row: 5,
     rates: { dividends: 23, capitalGains: 23, interest: 23 },
     notes: [
       'ПДФО 18% + військовий збір 5% на іноземні дивіденди, відсотки та інвестиційний прибуток.',
@@ -306,8 +259,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'ES',
     name: 'Іспанія',
     region: 'europe',
-    col: 2,
-    row: 6,
     rates: { dividends: 30, capitalGains: 30, interest: 30 },
     regime:
       'Закон Бекхема: 6 років іноземні дивіденди, відсотки й прирости не оподатковуються (для найманих працівників і стартаперів).',
@@ -320,8 +271,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'AD',
     name: 'Андорра',
     region: 'europe',
-    col: 3,
-    row: 6,
     rates: { dividends: 10, capitalGains: 10, interest: 10 },
     notes: [
       'Максимальна ставка ПДФО — 10%; перші 3 000 € доходу від заощаджень не оподатковуються.',
@@ -332,8 +281,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'MC',
     name: 'Монако',
     region: 'europe',
-    col: 4,
-    row: 6,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Немає податку на доходи фізосіб (крім громадян Франції).',
@@ -344,8 +291,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'SI',
     name: 'Словенія',
     region: 'europe',
-    col: 5,
-    row: 6,
     rates: { dividends: 25, capitalGains: 25, interest: 25 },
     notes: ['25%; ставка на приріст капіталу знижується з терміном володіння — 0% після 15 років.'],
   },
@@ -353,8 +298,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'HR',
     name: 'Хорватія',
     region: 'europe',
-    col: 6,
-    row: 6,
     rates: { dividends: 12, capitalGains: 12, interest: 12 },
     notes: ['12% на дохід від капіталу.', 'Продаж ЦП після 2 років володіння не оподатковується.'],
   },
@@ -362,8 +305,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'RO',
     name: 'Румунія',
     region: 'europe',
-    col: 7,
-    row: 6,
     rates: { dividends: 16, capitalGains: 16, interest: 10 },
     notes: [
       'Дивіденди — 16% з 2026 року.',
@@ -375,8 +316,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'GE',
     name: 'Грузія',
     region: 'europe',
-    col: 9,
-    row: 6,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Іноземні доходи фізичних осіб не оподатковуються.',
@@ -387,8 +326,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'PT',
     name: 'Португалія',
     region: 'europe',
-    col: 1,
-    row: 7,
     rates: { dividends: 28, capitalGains: 28, interest: 28 },
     regime:
       'IFICI («NHR 2.0»): 10 років іноземні дивіденди, відсотки й прирости звільнені — для науки, ІТ, стартапів та ін.',
@@ -401,8 +338,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'IT',
     name: 'Італія',
     region: 'europe',
-    col: 4,
-    row: 7,
     rates: { dividends: 26, capitalGains: 26, interest: 26 },
     regime:
       'Фіксований податок на всі іноземні доходи для нових резидентів (сотні тисяч € на рік) — до 15 років.',
@@ -415,8 +350,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'ME',
     name: 'Чорногорія',
     region: 'europe',
-    col: 5,
-    row: 7,
     rates: { dividends: 15, capitalGains: 15, interest: 15 },
     notes: ['15% на дивіденди, відсотки та приріст капіталу.'],
   },
@@ -424,8 +357,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'RS',
     name: 'Сербія',
     region: 'europe',
-    col: 6,
-    row: 7,
     rates: { dividends: 15, capitalGains: 15, interest: 15 },
     notes: ['15% на дохід від капіталу; приріст після 10 років володіння — звільнений.'],
   },
@@ -433,8 +364,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'BG',
     name: 'Болгарія',
     region: 'europe',
-    col: 7,
-    row: 7,
     rates: { dividends: 5, capitalGains: 10, interest: 8 },
     notes: [
       'Дивіденди — 5%, єдина ставка ПДФО — 10%.',
@@ -445,8 +374,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'MT',
     name: 'Мальта',
     region: 'europe',
-    col: 4,
-    row: 8,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Non-dom резиденти: іноземний дохід оподатковується лише при переказі на Мальту, іноземний приріст капіталу — ніколи.',
@@ -457,8 +384,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'GR',
     name: 'Греція',
     region: 'europe',
-    col: 6,
-    row: 8,
     rates: { dividends: 5, capitalGains: 15, interest: 15 },
     regime:
       'Non-dom: фіксовані 100 тис. € на рік за всі іноземні доходи (при інвестиції від 500 тис. €), до 15 років.',
@@ -471,8 +396,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CY',
     name: 'Кіпр',
     region: 'europe',
-    col: 8,
-    row: 8,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Новоприбулі отримують статус non-dom на 17 років: дивіденди й відсотки без податку і без внеску SDC.',
@@ -486,8 +409,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'AM',
     name: 'Вірменія',
     region: 'asia',
-    col: 1,
-    row: 1,
     rates: { dividends: 5, capitalGains: 10, interest: 10 },
     notes: [
       'Дивіденди — 5%, відсотки й приріст капіталу — 10%.',
@@ -498,8 +419,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'KZ',
     name: 'Казахстан',
     region: 'asia',
-    col: 3,
-    row: 1,
     rates: { dividends: 10, capitalGains: 10, interest: 10 },
     notes: [
       'Базова ставка 10%, для великих доходів — 15% (новий Податковий кодекс 2026).',
@@ -510,8 +429,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CN',
     name: 'Китай',
     region: 'asia',
-    col: 6,
-    row: 1,
     rates: { dividends: 20, capitalGains: 20, interest: 20 },
     regime:
       'Іноземці, які живуть у Китаї менше 6 років поспіль, не платять податку з іноземних доходів.',
@@ -521,8 +438,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'KR',
     name: 'Південна Корея',
     region: 'asia',
-    col: 7,
-    row: 1,
     rates: { dividends: 15.4, capitalGains: 22, interest: 15.4 },
     notes: [
       'Дивіденди й відсотки — 15,4% до 20 млн KRW на рік, понад — прогресивна шкала до 49,5%.',
@@ -533,8 +448,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'JP',
     name: 'Японія',
     region: 'asia',
-    col: 8,
-    row: 1,
     rates: { dividends: 20.32, capitalGains: 20.32, interest: 20.32 },
     notes: [
       '20,315% на інвестиційні доходи.',
@@ -546,8 +459,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'IL',
     name: 'Ізраїль',
     region: 'asia',
-    col: 1,
-    row: 2,
     rates: { dividends: 25, capitalGains: 25, interest: 25 },
     regime: 'Нові репатріанти (олім): 10 років іноземні доходи не оподатковуються.',
     notes: ['25% + додатковий податок 3–5% на високі доходи.'],
@@ -556,8 +467,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'BH',
     name: 'Бахрейн',
     region: 'asia',
-    col: 2,
-    row: 2,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на доходи фізичних осіб.'],
   },
@@ -565,8 +474,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'QA',
     name: 'Катар',
     region: 'asia',
-    col: 3,
-    row: 2,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на інвестиційні доходи фізичних осіб.'],
   },
@@ -574,8 +481,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'IN',
     name: 'Індія',
     region: 'asia',
-    col: 5,
-    row: 2,
     rates: { dividends: 35.88, capitalGains: 12.5, interest: 39 },
     regime: 'Статус RNOR: перші 2–3 роки іноземні доходи не оподатковуються.',
     notes: [
@@ -587,8 +492,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'HK',
     name: 'Гонконг',
     region: 'asia',
-    col: 7,
-    row: 2,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на дивіденди, відсотки й приріст капіталу для фізичних осіб.'],
   },
@@ -596,8 +499,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'SA',
     name: 'Саудівська Аравія',
     region: 'asia',
-    col: 2,
-    row: 3,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на доходи для фізичних осіб-іноземців.'],
   },
@@ -605,8 +506,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'AE',
     name: 'ОАЕ',
     region: 'asia',
-    col: 3,
-    row: 3,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Немає податку на доходи фізичних осіб.',
@@ -617,8 +516,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'TH',
     name: 'Таїланд',
     region: 'asia',
-    col: 6,
-    row: 3,
     rates: { dividends: 35, capitalGains: 35, interest: 35 },
     regime: 'Віза LTR: іноземні доходи, ввезені в країну, не оподатковуються.',
     notes: [
@@ -630,8 +527,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'MY',
     name: 'Малайзія',
     region: 'asia',
-    col: 6,
-    row: 4,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Іноземні доходи фізичних осіб звільнені (до 2036 року).',
@@ -642,8 +537,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'SG',
     name: 'Сінгапур',
     region: 'asia',
-    col: 6,
-    row: 5,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Іноземні доходи фізичних осіб, приріст капіталу та дивіденди не оподатковуються.'],
   },
@@ -653,8 +546,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CA',
     name: 'Канада',
     region: 'americas',
-    col: 2,
-    row: 1,
     rates: { dividends: 39.34, capitalGains: 26.76, interest: 53.53 },
     notes: [
       'Федеральний + провінційний податок (дані для Онтаріо, найвища ставка).',
@@ -666,8 +557,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'US',
     name: 'США',
     region: 'americas',
-    col: 2,
-    row: 2,
     rates: { dividends: 23.8, capitalGains: 23.8, interest: 40.8 },
     notes: [
       'Кваліфіковані дивіденди й довгостроковий приріст — до 20% + NIIT 3,8%.',
@@ -679,8 +568,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'MX',
     name: 'Мексика',
     region: 'americas',
-    col: 1,
-    row: 3,
     rates: { dividends: 35, capitalGains: 35, interest: 35 },
     notes: [
       'Іноземні інвестиційні доходи — за шкалою до 35%.',
@@ -691,8 +578,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'KY',
     name: 'Кайманові острови',
     region: 'americas',
-    col: 3,
-    row: 3,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на доходи, приріст капіталу й спадщину.'],
   },
@@ -700,8 +585,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'BS',
     name: 'Багами',
     region: 'americas',
-    col: 4,
-    row: 3,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Немає податку на доходи та приріст капіталу.'],
   },
@@ -709,8 +592,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CR',
     name: 'Коста-Рика',
     region: 'americas',
-    col: 2,
-    row: 4,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: ['Територіальна система: іноземні доходи фізичних осіб не оподатковуються.'],
   },
@@ -718,8 +599,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'PA',
     name: 'Панама',
     region: 'americas',
-    col: 3,
-    row: 4,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Територіальна система: іноземні доходи не оподатковуються.',
@@ -730,8 +609,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'BR',
     name: 'Бразилія',
     region: 'americas',
-    col: 4,
-    row: 5,
     rates: { dividends: 15, capitalGains: 15, interest: 15 },
     notes: [
       'З 2024 року іноземні інвестиції фізосіб — 15% раз на рік.',
@@ -742,8 +619,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'PY',
     name: 'Парагвай',
     region: 'americas',
-    col: 3,
-    row: 6,
     rates: { dividends: 0, capitalGains: 0, interest: 0 },
     notes: [
       'Територіальна система: іноземні доходи не оподатковуються.',
@@ -754,8 +629,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'CL',
     name: 'Чилі',
     region: 'americas',
-    col: 2,
-    row: 7,
     rates: { dividends: 40, capitalGains: 40, interest: 40 },
     regime: 'Перші 3 роки (з можливим продовженням) іноземці платять лише з чилійських доходів.',
     notes: ['Прогресивна шкала до 40% на світовий дохід.'],
@@ -764,8 +637,6 @@ export const COUNTRIES: readonly CountryTax[] = [
     code: 'UY',
     name: 'Уругвай',
     region: 'americas',
-    col: 4,
-    row: 7,
     rates: { dividends: 12, capitalGains: 0, interest: 12 },
     regime:
       'Податкові канікули для нових резидентів: 11 років іноземні дивіденди й відсотки не оподатковуються (або 7% замість 12%).',

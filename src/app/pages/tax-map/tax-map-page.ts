@@ -14,6 +14,7 @@ import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
 import { SITE_URL, localePath } from '../../core/site';
 import { Icon } from '../../shared/icon';
+import { MapView, WorldMap } from './world-map';
 import {
   BASELINE_CODE,
   COUNTRIES,
@@ -23,7 +24,6 @@ import {
   Metric,
   RATE_BINS,
   REGIONS,
-  Region,
   countriesIn,
   flagOf,
   formatRate,
@@ -41,27 +41,17 @@ const usd = new Intl.NumberFormat('uk-UA', {
   currency: 'USD',
   maximumFractionDigits: 0,
 });
-const shortRate = new Intl.NumberFormat('uk-UA', { maximumFractionDigits: 1 });
-
-interface Tile {
-  country: CountryTax;
-  rate: number;
-  text: string;
-  bg: string;
-  fg: string;
-  label: string;
-}
 
 @Component({
   selector: 'app-tax-map-page',
-  imports: [ReactiveFormsModule, Icon],
+  imports: [ReactiveFormsModule, Icon, WorldMap],
   templateUrl: './tax-map-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class TaxMapPage {
   protected readonly s = s;
   protected readonly icons = { Info };
-  protected readonly regions = REGIONS;
+  protected readonly regions: readonly MapView[] = ['world', ...REGIONS];
   protected readonly metrics = METRICS;
   protected readonly bins = RATE_BINS;
   protected readonly baseline = BASELINE;
@@ -69,7 +59,7 @@ export class TaxMapPage {
   protected readonly formatRate = formatRate;
   protected readonly disclaimer = s.disclaimer.map((line) => line.replace('{date}', DATA_UPDATED));
 
-  protected readonly region = signal<Region>('europe');
+  protected readonly region = signal<MapView>('europe');
   protected readonly metric = signal<Metric>('dividends');
   protected readonly selectedCode = signal(BASELINE_CODE);
 
@@ -84,30 +74,9 @@ export class TaxMapPage {
 
   private readonly detailHeading = viewChild.required<ElementRef<HTMLElement>>('detailHeading');
 
-  protected readonly countries = computed(() => countriesIn(this.region()));
-
-  protected readonly grid = computed(() => {
-    const list = this.countries();
-    return {
-      cols: Math.max(...list.map((c) => c.col)),
-      rows: Math.max(...list.map((c) => c.row)),
-    };
-  });
-
-  protected readonly tiles = computed<Tile[]>(() => {
-    const metric = this.metric();
-    return this.countries().map((country) => {
-      const rate = country.rates[metric];
-      const bin = rateBin(rate);
-      return {
-        country,
-        rate,
-        text: `${shortRate.format(rate)}%`,
-        bg: bin.bg,
-        fg: bin.fg,
-        label: `${country.name}: ${formatRate(rate)}${country.regime ? `, ${s.regimeMark}` : ''}`,
-      };
-    });
+  protected readonly countries = computed(() => {
+    const view = this.region();
+    return view === 'world' ? [...COUNTRIES] : countriesIn(view);
   });
 
   protected readonly mapLabel = computed(() =>

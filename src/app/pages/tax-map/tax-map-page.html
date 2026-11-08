@@ -82,41 +82,14 @@
           </h2>
           <p class="card-description">{{ s.mapHint }}</p>
         </div>
-        <div class="card-content space-y-5">
-          <div class="overflow-x-auto pb-1">
-            <div
-              role="group"
-              class="mx-auto grid w-full gap-1.5 p-1"
-              [attr.aria-label]="mapLabel()"
-              [style.grid-template-columns]="'repeat(' + grid().cols + ', minmax(0, 1fr))'"
-              [style.min-width.rem]="grid().cols * 3"
-              [style.max-width.rem]="grid().cols * 4.5"
-            >
-              @for (t of tiles(); track t.country.code) {
-                @let active = t.country.code === selectedCode();
-                <button
-                  type="button"
-                  class="relative flex aspect-square cursor-pointer flex-col items-center justify-center rounded-md leading-tight shadow-xs transition-transform hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground motion-reduce:transition-none motion-reduce:hover:scale-100"
-                  [class]="active ? 'z-10 scale-105 ring-[3px] ring-foreground' : ''"
-                  [style.grid-column]="t.country.col"
-                  [style.grid-row]="t.country.row"
-                  [style.background]="t.bg"
-                  [style.color]="t.fg"
-                  [attr.aria-pressed]="active"
-                  [attr.aria-label]="t.label"
-                  (click)="select(t.country.code)"
-                >
-                  <span class="text-xs font-bold md:text-sm">{{ t.country.code }}</span>
-                  <span class="text-[0.6875rem] tabular-nums md:text-xs">{{ t.text }}</span>
-                  @if (t.country.regime) {
-                    <span aria-hidden="true" class="absolute top-0.5 right-1 text-[0.625rem]"
-                      >★</span
-                    >
-                  }
-                </button>
-              }
-            </div>
-          </div>
+        <div class="card-content space-y-4">
+          <app-world-map
+            [view]="region()"
+            [metric]="metric()"
+            [selected]="selectedCode()"
+            [label]="mapLabel()"
+            (selectedChange)="select($event)"
+          />
 
           <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <span class="font-medium">{{ s.legend }}:</span>

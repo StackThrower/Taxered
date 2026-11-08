@@ -9,6 +9,7 @@ import {
   getCountry,
   rateBin,
 } from './tax-data';
+import { COUNTRY_SHAPES } from './world-shapes';
 
 describe('tax map data', () => {
   it('has unique country codes', () => {
@@ -16,17 +17,16 @@ describe('tax map data', () => {
     expect(new Set(codes).size).toBe(codes.length);
   });
 
-  it('places every country on its own tile within a region', () => {
-    for (const region of REGIONS) {
-      const cells = countriesIn(region).map((c) => `${c.col}:${c.row}`);
-      expect(new Set(cells).size, region).toBe(cells.length);
+  it('has a map shape for every country', () => {
+    const shapes = new Set(COUNTRY_SHAPES.map((s) => s.code));
+    for (const c of COUNTRIES) {
+      expect(shapes.has(c.code), c.code).toBe(true);
     }
+    expect(REGIONS.flatMap((r) => countriesIn(r)).length).toBe(COUNTRIES.length);
   });
 
-  it('keeps rates and grid positions in range', () => {
+  it('keeps rates in range', () => {
     for (const c of COUNTRIES) {
-      expect(c.col).toBeGreaterThanOrEqual(1);
-      expect(c.row).toBeGreaterThanOrEqual(1);
       expect(c.notes.length, c.code).toBeGreaterThan(0);
       for (const metric of METRICS) {
         expect(c.rates[metric], `${c.code} ${metric}`).toBeGreaterThanOrEqual(0);
