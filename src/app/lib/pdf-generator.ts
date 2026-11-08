@@ -26,6 +26,8 @@ export interface F0121214Data {
   taxNumber: string;
   year: string;
   notes: string;
+  /** Explanations of the calculation (`calculationNotes`). */
+  calculationNotes?: readonly string[];
   positions: F0121214Position[];
   calculations: {
     profit: number;
@@ -453,6 +455,22 @@ export const generateF0121214PDF = async (
     });
 
     yPos = lastTableEnd() + 12;
+
+    if (data.calculationNotes && data.calculationNotes.length > 0) {
+      doc.setFont('DejaVuSans', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(40, 40, 40);
+      for (const note of data.calculationNotes) {
+        const lines = doc.splitTextToSize(note, 180);
+        if (yPos + lines.length * 4 > 275) {
+          doc.addPage();
+          yPos = 20;
+        }
+        doc.text(lines, 15, yPos);
+        yPos += lines.length * 4 + 2;
+      }
+      yPos += 6;
+    }
 
     // Notes
     if (data.notes) {

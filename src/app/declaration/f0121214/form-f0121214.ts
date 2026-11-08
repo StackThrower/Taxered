@@ -25,10 +25,12 @@ import {
 import { Icon } from '../../shared/icon';
 import {
   ASSET_TYPES,
+  BrokerJurisdiction,
   DEFAULT_REPORT_YEAR,
   FinancialPosition,
   REPORT_YEARS,
   calculateTaxes,
+  calculationNotes,
   militaryTaxRateLabel,
   positionFxDifference,
 } from './tax-model';
@@ -63,6 +65,10 @@ function positionGroup(p: FinancialPosition): PositionGroup {
     multiplier: control(p.multiplier),
     source: control<BrokerSource | undefined>(p.source),
     sourceFile: control(p.sourceFile),
+    isin: control(p.isin),
+    broker: control(p.broker),
+    brokerJurisdiction: control<BrokerJurisdiction | undefined>(p.brokerJurisdiction),
+    assetCode: control(p.assetCode),
   });
 }
 
@@ -112,6 +118,9 @@ export class FormF0121214 {
     year: control(DEFAULT_REPORT_YEAR),
     notes: control(''),
     anonymous: control(false),
+    previousYearsLoss: control(''),
+    withheldPdfo: control(''),
+    withheldMilitaryLevy: control(''),
     positions: new FormArray<PositionGroup>([positionGroup(this.emptyPosition())]),
   });
 
@@ -128,9 +137,14 @@ export class FormF0121214 {
     { requireSync: true },
   );
 
-  protected readonly calculations = computed(() =>
-    calculateTaxes(this.value().positions, this.value().year),
-  );
+  protected readonly calculations = computed(() => {
+    const v = this.value();
+    return calculateTaxes(v.positions, v.year, {
+      previousYearsLoss: v.previousYearsLoss,
+      withheldPdfo: v.withheldPdfo,
+      withheldMilitaryLevy: v.withheldMilitaryLevy,
+    });
+  });
   protected readonly militaryRate = computed(() => militaryTaxRateLabel(this.value().year));
 
   protected readonly importing = signal(false);
@@ -449,6 +463,7 @@ export class FormF0121214 {
         ...this.identity(),
         year: v.year,
         notes: v.notes,
+        calculationNotes: calculationNotes(this.calculations(), v.positions),
         positions: v.positions,
         calculations: this.calculations(),
       },
@@ -468,6 +483,7 @@ export class FormF0121214 {
         year: v.year,
         positions: v.positions,
         calculations: this.calculations(),
+        calculationNotes: calculationNotes(this.calculations(), v.positions),
       },
       'uk',
     );
@@ -497,6 +513,11 @@ export class FormF0121214 {
         taxOfficeCode: v.taxOfficeCode,
       },
       positions: v.positions,
+      options: {
+        previousYearsLoss: v.previousYearsLoss,
+        withheldPdfo: v.withheldPdfo,
+        withheldMilitaryLevy: v.withheldMilitaryLevy,
+      },
       fillDate: new Date(),
     });
 
@@ -526,6 +547,9 @@ export class FormF0121214 {
       year: DEFAULT_REPORT_YEAR,
       notes: '',
       anonymous: false,
+      previousYearsLoss: '',
+      withheldPdfo: '',
+      withheldMilitaryLevy: '',
     });
     this.replacePositions([this.emptyPosition()]);
     this.xmlMessage.set(null);

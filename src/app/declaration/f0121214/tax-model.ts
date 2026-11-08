@@ -1,3 +1,6 @@
+import { computeF1, type F1Calculation } from '../../lib/dps-xml/f1';
+import { applyRate, toHryvnias, toKopecks } from '../../lib/dps-xml/money';
+import { RATE_BP, militaryLevyBp } from '../../lib/dps-xml/versions';
 import type { BrokerSource } from '../../lib/ib-xml-parser';
 
 export type AssetType =
@@ -36,6 +39,28 @@ export interface FinancialPosition {
   multiplier?: string;
   source?: BrokerSource;
   sourceFile?: string;
+  /** ISIN of the security, if the broker report has it. */
+  isin?: string;
+  /** Broker name for column 3 of Ф1, e.g. "Freedom Finance Europe". */
+  broker?: string;
+  /**
+   * Whose broker this is: 'ua' — a Ukrainian broker (tax agent, domestic exchange), 'foreign' —
+   * IB, Freedom Finance Europe and other foreign brokers. Decides the Ф1 column 2 code.
+   */
+  brokerJurisdiction?: BrokerJurisdiction;
+  /** Manual Ф1 column 2 code "1"–"4"; empty = automatic. */
+  assetCode?: string;
+}
+
+export type BrokerJurisdiction = '' | 'foreign' | 'ua';
+
+/** Annual inputs of the calculation besides the positions; UAH amounts as typed. */
+export interface TaxOptions {
+  /** Ф1 row 2: loss of previous years not yet offset. */
+  previousYearsLoss?: string;
+  /** Ф1 rows 4.1 / 5.1: withheld by a Ukrainian broker as tax agent. */
+  withheldPdfo?: string;
+  withheldMilitaryLevy?: string;
 }
 
 export interface TaxCalculations {
@@ -53,53 +78,86 @@ export interface TaxCalculations {
   fxDifference: number;
   /** PDFO and military levy that the exchange-rate difference adds (negative if it lowers them). */
   taxOnFx: number;
+  /** Annex Ф1 rows, in kopecks; the source of the trade figures above. */
+  f1: F1Calculation;
 }
 
 type TaxablePosition = Pick<
   FinancialPosition,
   'assetType' | 'purchasePrice' | 'salePrice' | 'expenses'
 > &
-  Partial<
-    Pick<FinancialPosition, 'currency' | 'purchasePriceForeign' | 'purchaseRate' | 'saleRate'>
-  >;
+  Partial<FinancialPosition>;
+
+function reportYear(year: string): number {
+  return parseInt(year) || 2026;
+}
 
 /** Military levy: 1.5% for report years up to 2024, 5% from 2025. */
 export function militaryTaxRate(year: string): number {
-  const reportYear = parseInt(year) || 2026;
-  return reportYear >= 2025 ? 0.05 : 0.015;
+  return militaryLevyBp(reportYear(year)) / 10000;
 }
 
 /** Rate for display, e.g. "5" or "1.5". */
 export function militaryTaxRateLabel(year: string): string {
-  return militaryTaxRate(year) === 0.05 ? '5' : '1.5';
+  return String(militaryLevyBp(reportYear(year)) / 100);
 }
 
 /**
- * Trades: 18% PDFO + military levy on the net profit (losses offset gains).
- * Dividends: reduced 9% PDFO + military levy on the amount received.
+ * Trades: annex Ф1 — 18% PDFO + military levy on the year's result less previous losses, nothing
+ * below the pp. "а" 170.2.8 threshold. Dividends: reduced 9% PDFO + military levy on the gross
+ * amount. All amounts are computed in kopecks and returned in hryvnias.
  */
 export function calculateTaxes(
   positions: readonly TaxablePosition[],
   year: string,
+  options: TaxOptions = {},
 ): TaxCalculations {
-  let profitFromTrades = 0;
+  const y = reportYear(year);
+  const f1 = computeF1(positions, y, {
+    previousYearsLoss: toKopecks(options.previousYearsLoss),
+    withheldPdfo: toKopecks(options.withheldPdfo),
+    withheldMilitaryLevy: toKopecks(options.withheldMilitaryLevy),
+  });
+
   let dividends = 0;
-  let fxDifference = 0;
-
   for (const pos of positions) {
-    const purchasePrice = Number.parseFloat(pos.purchasePrice) || 0;
-    const salePrice = Number.parseFloat(pos.salePrice) || 0;
-    const expenses = Number.parseFloat(pos.expenses) || 0;
-
     if (pos.assetType === 'dividends') {
-      dividends += salePrice;
-    } else {
-      profitFromTrades += salePrice - purchasePrice - expenses;
-      fxDifference += positionFxDifference(pos);
+      dividends += toKopecks(pos.salePrice);
     }
   }
 
-  return taxesOnIncome(profitFromTrades, dividends, year, fxDifference);
+  // Exchange-rate difference of the lots that made it into Ф1 (display only).
+  const fxDifference = f1.belowThreshold
+    ? 0
+    : positions
+        .filter((p) => p.assetType !== 'dividends' && p.assetType !== 'crypto')
+        .reduce((sum, p) => sum + positionFxDifference(p), 0);
+
+  const pdfoFromDividends = dividends > 0 ? applyRate(dividends, RATE_BP.pdfoDividends) : 0;
+  const militaryFromDividends = dividends > 0 ? applyRate(dividends, militaryLevyBp(y)) : 0;
+  const pdfo = f1.pdfoPayable + pdfoFromDividends;
+  const militaryTax = f1.militaryLevyPayable + militaryFromDividends;
+  const profitFromTrades = toHryvnias(f1.financialResult);
+  const rate = militaryTaxRate(year);
+  const withoutFx = Math.max(0, profitFromTrades - fxDifference);
+  const pdfoFromTrades = toHryvnias(f1.pdfoPayable);
+  const militaryTaxFromTrades = toHryvnias(f1.militaryLevyPayable);
+
+  return {
+    profit: profitFromTrades + toHryvnias(dividends),
+    pdfo: toHryvnias(pdfo),
+    militaryTax: toHryvnias(militaryTax),
+    total: toHryvnias(pdfo + militaryTax),
+    profitFromTrades,
+    dividends: toHryvnias(dividends),
+    pdfoFromTrades,
+    pdfoFromDividends: toHryvnias(pdfoFromDividends),
+    militaryTaxFromTrades,
+    militaryTaxFromDividends: toHryvnias(militaryFromDividends),
+    fxDifference,
+    taxOnFx: f1.profit > 0 ? pdfoFromTrades + militaryTaxFromTrades - withoutFx * (0.18 + rate) : 0,
+    f1,
+  };
 }
 
 /**
@@ -118,15 +176,15 @@ export function positionFxDifference(pos: TaxablePosition): number {
 }
 
 /**
- * Taxes on already aggregated UAH income: net trade profit and dividends received.
- * `fxDifference` is the exchange-rate part of `profitFromTrades`, used to report the tax it adds.
+ * Taxes on already aggregated UAH income (the returns calculator): net trade profit and dividends
+ * received. `fxDifference` is the exchange-rate part of `profitFromTrades`.
  */
 export function taxesOnIncome(
   profitFromTrades: number,
   dividends: number,
   year: string,
   fxDifference = 0,
-): TaxCalculations {
+): Omit<TaxCalculations, 'f1'> {
   const rate = militaryTaxRate(year);
   const withoutFx = Math.max(0, profitFromTrades - fxDifference);
   const pdfoFromTrades = profitFromTrades > 0 ? profitFromTrades * 0.18 : 0;
@@ -151,4 +209,43 @@ export function taxesOnIncome(
     fxDifference,
     taxOnFx: pdfoFromTrades + militaryTaxFromTrades - withoutFx * (0.18 + rate),
   };
+}
+
+/**
+ * Explanations printed in the PDF and Excel next to the figures: rows of Ф1 that are not obvious
+ * from the totals, excluded positions and how lots were matched (open question 9).
+ */
+export function calculationNotes(
+  calc: Pick<TaxCalculations, 'f1'>,
+  positions: readonly Pick<FinancialPosition, 'source' | 'assetType'>[],
+): string[] {
+  const { f1 } = calc;
+  const uah = (kopecks: number) => `${toHryvnias(kopecks).toFixed(2)} грн`;
+  const notes: string[] = [];
+  if (f1.previousYearsLoss > 0) {
+    notes.push(
+      `Ф1, рядок 2 — від'ємний фінансовий результат попередніх років: ${uah(f1.previousYearsLoss)}.`,
+    );
+  }
+  if (f1.loss > 0) {
+    notes.push(`Ф1, рядок 3.2 — збиток, що переноситься на наступний рік: ${uah(f1.loss)}.`);
+  }
+  if (f1.pdfoWithheld > 0 || f1.militaryLevyWithheld > 0) {
+    notes.push(
+      `Ф1, рядки 4.1 / 5.1 — утримано податковим агентом: ПДФО ${uah(f1.pdfoWithheld)}, військовий збір ${uah(f1.militaryLevyWithheld)}.`,
+    );
+  }
+  notes.push(...f1.warnings);
+
+  const trades = positions.filter((p) => p.assetType !== 'dividends');
+  const methods = [
+    trades.some((p) => p.source === 'interactive_brokers')
+      ? 'Interactive Brokers — закриті лоти зі звіту брокера'
+      : '',
+    trades.some((p) => p.source === 'freedom_finance') ? 'Freedom Finance — FIFO' : '',
+  ].filter(Boolean);
+  if (methods.length > 0) {
+    notes.push(`Метод визначення лотів: ${methods.join('; ')}.`);
+  }
+  return notes;
 }

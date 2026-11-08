@@ -47,7 +47,7 @@ function f1File(positions: FinancialPosition[], overrides: Partial<PackageInput>
 
 describe('buildDeclarationPackage: Ф1', () => {
   it('writes the F0121215 header and a DPS-style file name', () => {
-    const file = f1File([position({ purchasePrice: '1000', salePrice: '1500' })]);
+    const file = f1File([position({ purchasePrice: '10000', salePrice: '15000' })]);
 
     expect(file.xml).toContain('<C_DOC>F01</C_DOC>');
     expect(file.xml).toContain('<C_DOC_SUB>212</C_DOC_SUB>');
@@ -62,7 +62,7 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('puts no whitespace between elements', () => {
-    const { xml } = f1File([position({ salePrice: '1' })]);
+    const { xml } = f1File([position({ salePrice: '10000' })]);
     expect(xml).not.toMatch(/>\s+</);
     expect(xml.startsWith('<?xml version="1.0" encoding="windows-1251"?><DECLAR ')).toBe(true);
   });
@@ -88,18 +88,38 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('reports a net loss in row 3.2 without tax rows', () => {
-    const file = f1File([position({ purchasePrice: '1000', salePrice: '400' })]);
+    const file = f1File([position({ purchasePrice: '16000', salePrice: '10000' })]);
 
-    expect(file.xml).toContain('<R003G6>-600.00</R003G6>');
-    expect(file.xml).toContain('<R032G6>600.00</R032G6>');
+    expect(file.xml).toContain('<R003G6>-6000.00</R003G6>');
+    expect(file.xml).toContain('<R032G6>6000.00</R032G6>');
     expect(file.xml).not.toContain('R004G6');
     expect(file.xml).not.toContain('R005G6');
     expectValid(file);
   });
 
+  it('writes rows 2, 4.1 and 5.1 in schema order', () => {
+    const file = f1File([position({ purchasePrice: '10000', salePrice: '30000' })], {
+      options: { previousYearsLoss: '5000', withheldPdfo: '100', withheldMilitaryLevy: '50' },
+    });
+
+    expect(file.xml).toContain('<R002G6>5000.00</R002G6><R003G6>15000.00</R003G6>');
+    expect(file.xml).toContain('<R041G6>100.00</R041G6>');
+    expect(file.xml).toContain('<R051G6>50.00</R051G6>');
+    expectValid(file);
+  });
+
+  it('forms no Ф1 within the pp. "а" 170.2.8 threshold', () => {
+    const result = buildDeclarationPackage({
+      ...base,
+      positions: [position({ purchasePrice: '1000', salePrice: '4240' })],
+    });
+    expect(result).toMatchObject({ ok: false });
+    expect(result.ok ? '' : result.message).toContain('170.2.8');
+  });
+
   it('leaves out dividends and real estate', () => {
     const { f1 } = build([
-      position({ salePrice: '100' }),
+      position({ salePrice: '10000' }),
       position({ assetType: 'dividends', salePrice: '50' }),
       position({ assetType: 'real_estate', salePrice: '900000' }),
     ]);
@@ -109,13 +129,13 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('uses code 2 for hryvnia trades on a domestic exchange', () => {
-    const { f1 } = build([position({ currency: 'UAH', salePrice: '100' })]);
+    const { f1 } = build([position({ currency: 'UAH', salePrice: '10000' })]);
     expect(f1?.rows[0].code).toBe(2);
   });
 
   it('picks the form version by income year', () => {
-    const v14 = f1File([position({ salePrice: '100' })], { year: '2024' });
-    const v13 = f1File([position({ salePrice: '100' })], { year: '2022' });
+    const v14 = f1File([position({ salePrice: '10000' })], { year: '2024' });
+    const v13 = f1File([position({ salePrice: '10000' })], { year: '2022' });
 
     expect(v14.name).toContain('F0121214');
     expect(v14.xml).toContain('noNamespaceSchemaLocation="F0121214.xsd"');
@@ -128,7 +148,7 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('rejects input the e-cabinet would refuse', () => {
-    const trade = [position({ salePrice: '100' })];
+    const trade = [position({ salePrice: '10000' })];
     const taxpayer = base.taxpayer;
     expect(
       buildDeclarationPackage({
@@ -149,7 +169,7 @@ describe('buildDeclarationPackage: Ф1', () => {
 
   it('accepts a passport or an ID-card number instead of the RNOKPP', () => {
     for (const taxNumber of ['кв 123456', '123456789']) {
-      const file = f1File([position({ salePrice: '100' })], {
+      const file = f1File([position({ salePrice: '10000' })], {
         taxpayer: { ...base.taxpayer, taxNumber },
       });
       expectValid(file);
@@ -157,7 +177,7 @@ describe('buildDeclarationPackage: Ф1', () => {
   });
 
   it('escapes XML special characters and warns about characters outside windows-1251', () => {
-    const result = build([position({ salePrice: '1', assetDescription: 'AT&T <Inc> "€✓"' })]);
+    const result = build([position({ salePrice: '10000', assetDescription: 'AT&T <Inc> "€✓"' })]);
     const file = result.files[0];
 
     expect(file.xml).toContain('AT&amp;T &lt;Inc&gt; &quot;€✓&quot;');

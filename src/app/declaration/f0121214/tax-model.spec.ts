@@ -18,17 +18,17 @@ describe('calculateTaxes', () => {
   });
 
   it('uses the 1.5% military levy for 2024 and earlier', () => {
-    const result = calculateTaxes([trade('0', '1000')], '2024');
+    const result = calculateTaxes([trade('0', '10000')], '2024');
 
-    expect(result.militaryTax).toBeCloseTo(15);
+    expect(result.militaryTax).toBeCloseTo(150);
     expect(militaryTaxRateLabel('2024')).toBe('1.5');
     expect(militaryTaxRateLabel('2025')).toBe('5');
   });
 
   it('offsets losses against gains and does not tax a net loss', () => {
-    const result = calculateTaxes([trade('1000', '1500'), trade('2000', '1000')], '2026');
+    const result = calculateTaxes([trade('10000', '15000'), trade('20000', '10000')], '2026');
 
-    expect(result.profitFromTrades).toBe(-500);
+    expect(result.profitFromTrades).toBe(-5000);
     expect(result.pdfo).toBe(0);
     expect(result.total).toBe(0);
   });
@@ -83,6 +83,31 @@ describe('calculateTaxes', () => {
 
     expect(result.fxDifference).toBe(3000);
     expect(result.taxOnFx).toBeCloseTo(2000 * 0.23);
+  });
+
+  it('reduces the trade result by the loss of previous years', () => {
+    const result = calculateTaxes([trade('10000', '15000')], '2025', { previousYearsLoss: '3000' });
+
+    expect(result.profitFromTrades).toBe(2000);
+    expect(result.pdfo).toBe(360);
+    expect(result.militaryTax).toBe(100);
+  });
+
+  it('does not tax sales within the pp. "а" 170.2.8 threshold', () => {
+    const result = calculateTaxes([trade('1000', '4240')], '2025');
+
+    expect(result.f1.belowThreshold).toBe(true);
+    expect(result.total).toBe(0);
+  });
+
+  it('leaves virtual assets out of the trade result', () => {
+    const result = calculateTaxes(
+      [trade('10000', '15000'), { ...trade('0', '50000'), assetType: 'crypto' }],
+      '2025',
+    );
+
+    expect(result.profitFromTrades).toBe(5000);
+    expect(result.f1.warnings.join()).toContain('Віртуальні активи (1)');
   });
 
   it('has no exchange-rate difference for UAH trades, dividends or missing rates', () => {

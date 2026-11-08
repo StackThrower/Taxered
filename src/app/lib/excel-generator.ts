@@ -41,6 +41,8 @@ interface FormData {
   year: string;
   positions: FinancialPosition[];
   calculations: Calculations;
+  /** Explanations of the calculation (`calculationNotes`). */
+  calculationNotes?: readonly string[];
 }
 
 export function generateTaxCalculationExcel(formData: FormData, language: string = 'uk') {
@@ -125,6 +127,10 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
         t.rate5,
       ]);
     }
+  }
+
+  for (const note of formData.calculationNotes ?? []) {
+    summaryData.push([note, '', '', '']);
   }
 
   const wsSummary = XLSX.utils.aoa_to_sheet(summaryData);

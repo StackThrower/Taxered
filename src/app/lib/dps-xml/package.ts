@@ -2,9 +2,10 @@
  * The package for the DPS e-cabinet: windows-1251 XML files named by the standard. Nothing here
  * talks to the network; the files are built and downloaded in the browser.
  */
-import type { FinancialPosition } from '../../declaration/f0121214/tax-model';
+import type { FinancialPosition, TaxOptions } from '../../declaration/f0121214/tax-model';
 import { encodeWindows1251, unencodableChars } from './encoding';
 import { computeF1, renderF1Rows, type F1Calculation } from './f1';
+import { toKopecks } from './money';
 import { docFileName, renderHead, schemaName, type DocCode, type DocContext } from './header';
 import {
   normalizeTaxOffice,
@@ -20,6 +21,7 @@ export interface PackageInput {
   year: string;
   taxpayer: Pick<Taxpayer, 'fullName' | 'taxNumber' | 'taxOfficeCode'>;
   positions: readonly FinancialPosition[];
+  options?: TaxOptions;
   /** Fill date; passed in so the output is deterministic. */
   fillDate: Date;
 }
@@ -58,12 +60,18 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
     fillDate: formatDdMmYyyy(input.fillDate),
   };
 
-  const f1 = computeF1(input.positions, year);
-  if (f1.rows.length === 0) {
+  const options = input.options ?? {};
+  const f1 = computeF1(input.positions, year, {
+    previousYearsLoss: toKopecks(options.previousYearsLoss),
+    withheldPdfo: toKopecks(options.withheldPdfo),
+    withheldMilitaryLevy: toKopecks(options.withheldMilitaryLevy),
+  });
+  if (f1.rows.length === 0 || f1.belowThreshold) {
     return {
       ok: false,
-      message:
-        'Немає операцій з інвестиційними активами для додатка Ф1. Дивіденди та нерухомість у Ф1 не включаються.',
+      message: f1.belowThreshold
+        ? f1.warnings[f1.warnings.length - 1]
+        : 'Немає операцій з інвестиційними активами для додатка Ф1. Дивіденди та нерухомість у Ф1 не включаються.',
     };
   }
 
@@ -83,7 +91,7 @@ export function buildDeclarationPackage(input: PackageInput): PackageResult {
   ]);
 
   const files = [toFile('f1', docFileName(ctx, f1Doc), xml)];
-  return { ok: true, files, warnings: encodingWarnings(files), f1 };
+  return { ok: true, files, warnings: [...f1.warnings, ...encodingWarnings(files)], f1 };
 }
 
 function toFile(kind: PackageFile['kind'], name: string, xml: string): PackageFile {
