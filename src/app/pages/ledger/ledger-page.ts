@@ -15,6 +15,7 @@ import { SeoService } from '../../core/seo.service';
 import { SITE_URL, localePath } from '../../core/site';
 import {
   LedgerAnalysis,
+  LedgerOperation,
   Swap,
   analyzeLedger,
   isLedgerCsv,
@@ -22,12 +23,12 @@ import {
   spreadsByPair,
 } from '../../lib/ledger-csv';
 import { Icon } from '../../shared/icon';
-
-const LOCALE = 'uk-UA';
+import { ledgerFormatters } from './format';
+import { LedgerPortfolio } from './ledger-portfolio';
 
 @Component({
   selector: 'app-ledger-page',
-  imports: [ReactiveFormsModule, Icon],
+  imports: [ReactiveFormsModule, Icon, LedgerPortfolio],
   templateUrl: './ledger-page.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -36,6 +37,7 @@ export class LedgerPage {
   protected readonly icons = { AlertCircle, FileText, Info, Upload };
 
   protected readonly fileName = signal<string | null>(null);
+  protected readonly operations = signal<LedgerOperation[]>([]);
   protected readonly analysis = signal<LedgerAnalysis | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly reading = signal(false);
@@ -77,24 +79,7 @@ export class LedgerPage {
     () => this.analysis()?.fees.reduce((sum, fee) => sum + fee.transactions, 0) ?? 0,
   );
 
-  protected readonly formatters = computed(() => {
-    const fiat = this.analysis()?.fiat ?? 'USD';
-    const money = currencyFormat(fiat);
-    const amount = new Intl.NumberFormat(LOCALE, { maximumSignificantDigits: 6 });
-    const percent = new Intl.NumberFormat(LOCALE, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-    const dateTime = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'short', timeStyle: 'short' });
-    const date = new Intl.DateTimeFormat(LOCALE, { dateStyle: 'medium' });
-    return {
-      money: (value: number) => money.format(value),
-      amount: (value: number) => amount.format(value),
-      percent: (value: number) => `${percent.format(value)}%`,
-      dateTime: (time: number) => dateTime.format(time),
-      date: (time: number) => date.format(time),
-    };
-  });
+  protected readonly formatters = computed(() => ledgerFormatters(this.analysis()?.fiat || 'USD'));
 
   protected readonly methodNotes = computed(() => {
     const fiat = this.analysis()?.fiat || 'USD';
@@ -189,11 +174,13 @@ export class LedgerPage {
       if (!isLedgerCsv(content)) {
         throw new Error(this.s.notLedger);
       }
-      const analysis = analyzeLedger(parseLedgerCsv(content));
+      const operations = parseLedgerCsv(content);
+      const analysis = analyzeLedger(operations);
       if (analysis.operations === 0) {
         throw new Error(this.s.empty);
       }
       this.fileName.set(file.name);
+      this.operations.set(operations);
       this.analysis.set(analysis);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -201,14 +188,5 @@ export class LedgerPage {
     } finally {
       this.reading.set(false);
     }
-  }
-}
-
-function currencyFormat(code: string): Intl.NumberFormat {
-  try {
-    return new Intl.NumberFormat(LOCALE, { style: 'currency', currency: code });
-  } catch {
-    // Not an ISO 4217 code (Ledger also offers BTC or ETH as the countervalue).
-    return new Intl.NumberFormat(LOCALE, { maximumSignificantDigits: 6 });
   }
 }

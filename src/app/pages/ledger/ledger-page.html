@@ -105,6 +105,8 @@
         </div>
       </div>
 
+      <app-ledger-portfolio [operations]="operations()" [analysis]="a" [format]="f" />
+
       @if (linkedCount() > 0) {
         <div class="space-y-1">
           <label class="label cursor-pointer">

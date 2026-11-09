@@ -25,9 +25,10 @@ const COLUMNS = {
   account: 'Account Name',
   fiat: 'Countervalue Ticker',
   value: 'Countervalue at Operation Date',
+  exportValue: 'Countervalue at CSV Export',
 } as const;
 
-const CONFIRMED = 'Confirmed';
+export const CONFIRMED = 'Confirmed';
 
 /** A receive matched to a send may come this long after it (providers, bridges). */
 const LINK_AFTER_MS = 3 * 60 * 60 * 1000;
@@ -58,6 +59,20 @@ export interface LedgerOperation {
   fiat: string;
   /** Fiat value at the operation date; `null` if Ledger has no price. */
   value: number | null;
+  /** Fiat value of the same amount when the file was exported; `null` if unknown. */
+  exportValue: number | null;
+}
+
+/**
+ * Value that entered (positive) or left (negative) the wallet: a send or a receive that is
+ * not part of a swap. Network fees are not flows; they are part of the result.
+ */
+export interface Flow {
+  time: number;
+  hash: string;
+  ticker: string;
+  amount: number;
+  value: number;
 }
 
 /** Network fees of one account in its coin. */
@@ -81,6 +96,8 @@ export interface Swap {
   kind: 'tx' | 'linked';
   /** Time of the send. */
   time: number;
+  /** Time of the receive; later than `time` for a linked swap, while the value is in transit. */
+  receivedTime: number;
   hashes: string[];
   given: SwapLeg[];
   received: SwapLeg[];
@@ -118,6 +135,8 @@ export interface LedgerAnalysis {
   feeValue: number;
   /** Newest first. */
   swaps: Swap[];
+  /** Deposits and withdrawals, oldest first. */
+  flows: Flow[];
 }
 
 export function isLedgerCsv(content: string): boolean {
@@ -136,6 +155,7 @@ export function parseLedgerCsv(content: string): LedgerOperation[] {
     }
     return index;
   };
+  const optionalColumn = (name: string): number => header.indexOf(name);
   const c = {
     date: column(COLUMNS.date),
     status: column(COLUMNS.status),
@@ -147,12 +167,14 @@ export function parseLedgerCsv(content: string): LedgerOperation[] {
     account: column(COLUMNS.account),
     fiat: column(COLUMNS.fiat),
     value: column(COLUMNS.value),
+    exportValue: optionalColumn(COLUMNS.exportValue),
   };
 
   return rows
     .filter((row) => row.length > 1)
     .map((row) => {
       const value = row[c.value]?.trim() ?? '';
+      const exportValue = c.exportValue < 0 ? '' : (row[c.exportValue]?.trim() ?? '');
       return {
         time: Date.parse(row[c.date]),
         status: row[c.status] ?? '',
@@ -164,6 +186,7 @@ export function parseLedgerCsv(content: string): LedgerOperation[] {
         account: row[c.account] ?? '',
         fiat: row[c.fiat] ?? '',
         value: value === '' ? null : parseNumber(value),
+        exportValue: exportValue === '' ? null : parseNumber(exportValue),
       };
     })
     .filter((op) => !Number.isNaN(op.time));
@@ -208,17 +231,34 @@ export function analyzeLedger(all: readonly LedgerOperation[]): LedgerAnalysis {
     const { given, received } = netMovements(group, feeOps, prices);
     const time = Math.min(...group.map((op) => op.time));
     if (given.length > 0 && received.length > 0) {
-      swaps.push(makeSwap('tx', time, [hash], given, received, feeByHash.get(hash) ?? 0));
+      swaps.push(makeSwap('tx', [time, time], [hash], given, received, feeByHash.get(hash) ?? 0));
     } else {
       sends.push(...given.map((leg) => ({ ...leg, time, hash })));
       receives.push(...received.map((leg) => ({ ...leg, time, hash })));
     }
   }
 
-  for (const [send, receive] of linkMovements(sends, receives)) {
+  const links = linkMovements(sends, receives);
+  const linked = new Set(links.flat());
+  const flow =
+    (sign: number) =>
+    (m: Movement): Flow => ({
+      time: m.time,
+      hash: m.hash,
+      ticker: m.ticker,
+      amount: sign * m.amount,
+      value: sign * m.value,
+    });
+  const flows = [
+    ...sends.filter((m) => !linked.has(m)).map(flow(-1)),
+    ...receives.filter((m) => !linked.has(m)).map(flow(1)),
+  ].sort((a, b) => a.time - b.time);
+
+  for (const [send, receive] of links) {
     const hashes = [send.hash, receive.hash];
     const fee = hashes.reduce((sum, hash) => sum + (feeByHash.get(hash) ?? 0), 0);
-    swaps.push(makeSwap('linked', send.time, hashes, [leg(send)], [leg(receive)], fee));
+    const times: [number, number] = [send.time, receive.time];
+    swaps.push(makeSwap('linked', times, hashes, [leg(send)], [leg(receive)], fee));
   }
   swaps.sort((a, b) => b.time - a.time);
 
@@ -233,6 +273,7 @@ export function analyzeLedger(all: readonly LedgerOperation[]): LedgerAnalysis {
     fees: feeTotals,
     feeValue: feeTotals.reduce((sum, fee) => sum + fee.value, 0),
     swaps,
+    flows,
   };
 }
 
@@ -364,7 +405,7 @@ function linkMovements(
 
 function makeSwap(
   kind: Swap['kind'],
-  time: number,
+  [time, receivedTime]: [number, number],
   hashes: string[],
   given: SwapLeg[],
   received: SwapLeg[],
@@ -376,6 +417,7 @@ function makeSwap(
   return {
     kind,
     time,
+    receivedTime,
     hashes,
     given,
     received,
@@ -391,17 +433,43 @@ function makeSwap(
  * Prices per asset, from operations whose fiat value is large enough not to be distorted by
  * Ledger's rounding to cents. Small fees (often shown as 0.00) are valued with them.
  */
-class PriceBook {
+export class PriceBook {
   private readonly points = new Map<string, { time: number; price: number }[]>();
+  /** Prices from small operations, for assets that have no larger ones. */
+  private readonly roughPoints = new Map<string, { time: number; price: number }[]>();
 
   constructor(ops: readonly LedgerOperation[]) {
-    for (const op of ops) {
-      if (op.value !== null && op.value >= PRICE_MIN_VALUE && op.amount > 0) {
-        const list = this.points.get(op.ticker) ?? [];
-        list.push({ time: op.time, price: op.value / op.amount });
-        this.points.set(op.ticker, list);
+    for (const op of [...ops].sort((a, b) => a.time - b.time)) {
+      if (op.value === null || op.value <= 0 || op.amount <= 0) {
+        continue;
       }
+      const points = op.value >= PRICE_MIN_VALUE ? this.points : this.roughPoints;
+      const list = points.get(op.ticker) ?? [];
+      list.push({ time: op.time, price: op.value / op.amount });
+      points.set(op.ticker, list);
     }
+  }
+
+  /**
+   * Price of `ticker` at `time`, interpolated between the nearest known prices; the first or
+   * last known price outside them. `null` if the asset was never priced.
+   */
+  priceAt(ticker: string, time: number): number | null {
+    const points = this.points.get(ticker) ?? this.roughPoints.get(ticker);
+    if (!points?.length) {
+      return null;
+    }
+    const next = points.findIndex((p) => p.time >= time);
+    if (next === 0) {
+      return points[0].price;
+    }
+    if (next < 0) {
+      return points[points.length - 1].price;
+    }
+    const a = points[next - 1];
+    const b = points[next];
+    const t = b.time === a.time ? 1 : (time - a.time) / (b.time - a.time);
+    return a.price + (b.price - a.price) * t;
   }
 
   /** Fiat value of `amount` of the operation's asset at the operation's time. */
