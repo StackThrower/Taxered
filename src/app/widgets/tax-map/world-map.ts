@@ -17,7 +17,7 @@ import {
 import { Minus, Plus, RotateCcw } from 'lucide';
 import { UK } from '../../core/i18n';
 import { Icon } from '../../shared/icon';
-import { COUNTRIES, CountryTax, Metric, Region, formatRate, rateBin } from './tax-data';
+import { COUNTRIES, CountryTax, Metric, Region, formatRate, rateBin } from '../../lib/tax-data';
 import { BACKGROUND_PATH, COUNTRY_SHAPES, MAP_VIEWS, ViewBox } from './world-shapes';
 
 export type MapView = Region | 'world';

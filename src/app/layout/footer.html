@@ -21,11 +21,14 @@
       <nav class="md:col-span-2" [attr.aria-label]="s.documents">
         <h2 class="mb-3 text-sm font-semibold md:mb-4 md:text-base">{{ s.documents }}</h2>
         <ul class="space-y-2 text-xs opacity-90 md:text-sm">
-          @for (form of forms; track form.id) {
+          @for (topic of topics; track topic.id) {
             <li>
-              <a [routerLink]="paths.home" fragment="forms" class="hover:underline">{{
-                form.title
-              }}</a>
+              <a
+                [routerLink]="paths.home"
+                [queryParams]="{ topic: topic.id }"
+                class="hover:underline"
+                >{{ topic.title }}</a
+              >
             </li>
           }
         </ul>
@@ -38,15 +41,6 @@
           </li>
           <li>
             <a [routerLink]="paths.knowledge" class="hover:underline">{{ knowledgeTitle }}</a>
-          </li>
-          <li>
-            <a [routerLink]="paths.taxMap" class="hover:underline">{{ taxMapTitle }}</a>
-          </li>
-          <li>
-            <a [routerLink]="paths.calculator" class="hover:underline">{{ calculatorTitle }}</a>
-          </li>
-          <li>
-            <a [routerLink]="paths.ledger" class="hover:underline">{{ ledgerTitle }}</a>
           </li>
         </ul>
       </nav>

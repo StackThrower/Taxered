@@ -4,8 +4,8 @@ import {
   ibCsvYearIncome,
   isIbCsvStatement,
   parseIbCsvStatement,
-} from '../../lib/ib-csv-parser';
-import { fetchNBUExchangeRate } from '../../lib/nbu-exchange-rates';
+} from './ib-csv-parser';
+import { fetchNBUExchangeRate } from './nbu-exchange-rates';
 import type { FileIncome } from './returns-model';
 
 /** Parallel NBU requests per import; enough to be quick without hammering the API. */
@@ -17,12 +17,11 @@ export interface BrokerReport {
   statement: IbCsvStatement;
 }
 
-export async function readBrokerReport(file: File): Promise<BrokerReport> {
-  const content = await file.text();
+export function parseBrokerReport(name: string, content: string): BrokerReport {
   if (!isIbCsvStatement(content)) {
     throw new Error('це не CSV-виписка Interactive Brokers (Activity Statement)');
   }
-  return { name: file.name, statement: parseIbCsvStatement(content) };
+  return { name, statement: parseIbCsvStatement(content) };
 }
 
 /**

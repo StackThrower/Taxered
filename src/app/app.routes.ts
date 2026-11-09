@@ -1,27 +1,25 @@
 import { ActivatedRouteSnapshot, Routes } from '@angular/router';
 import { LOCALE } from './core/site';
 
-const homePage = () => import('./pages/home/home-page').then((m) => m.HomePage);
+const chatPage = () => import('./chat/chat-page').then((m) => m.ChatPage);
+
+/** The former tool pages are now tasks of the chat assistant. */
+export const LEGACY_TOOL_PAGES: Readonly<Record<string, string>> = {
+  calculator: 'returns',
+  'tax-map': 'tax-map',
+  ledger: 'spreads',
+};
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', loadComponent: homePage, data: { root: true } },
+  { path: '', pathMatch: 'full', loadComponent: chatPage, data: { root: true } },
   {
     path: LOCALE,
     children: [
-      { path: '', pathMatch: 'full', loadComponent: homePage },
-      {
-        path: 'calculator',
-        loadComponent: () =>
-          import('./pages/calculator/calculator-page').then((m) => m.CalculatorPage),
-      },
-      {
-        path: 'tax-map',
-        loadComponent: () => import('./pages/tax-map/tax-map-page').then((m) => m.TaxMapPage),
-      },
-      {
-        path: 'ledger',
-        loadComponent: () => import('./pages/ledger/ledger-page').then((m) => m.LedgerPage),
-      },
+      { path: '', pathMatch: 'full', loadComponent: chatPage },
+      ...Object.entries(LEGACY_TOOL_PAGES).map(([path, topic]) => ({
+        path,
+        redirectTo: `/${LOCALE}?topic=${topic}`,
+      })),
       {
         path: 'about',
         loadComponent: () => import('./pages/about/about-page').then((m) => m.AboutPage),

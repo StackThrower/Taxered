@@ -4,9 +4,15 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
+import { MemorySaver } from '@langchain/langgraph';
 import express from 'express';
 import { basename, join } from 'node:path';
-import { SITE_URL } from './app/core/site';
+import { buildTaxeredAgent } from './agent/graph';
+import { chatRouter } from './agent/http';
+import { anthropicModels, isAgentConfigured } from './agent/model';
+import { CHAT_API } from './app/chat/protocol';
+import { LEGACY_TOOL_PAGES } from './app/app.routes';
+import { LOCALE, SITE_URL } from './app/core/site';
 import { buildSitemap } from './app/core/sitemap';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -24,6 +30,8 @@ const LEGACY_URLS = new Set([
   '/en-us/home',
 ]);
 
+const LEGACY_TOOL_PAGE = new RegExp(`^/${LOCALE}/(${Object.keys(LEGACY_TOOL_PAGES).join('|')})/?$`);
+
 /**
  * Content-Security-Policy.
  *
@@ -40,8 +48,8 @@ function contentSecurityPolicy(isLocal: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.clarity.ms https://c.bing.com",
     "font-src 'self' data:",
-    // Analytics beacons, the NBU exchange-rate API, and CoinGecko and Binance crypto prices
-    // (Ledger page). Everything else is denied.
+    // The chat API (same origin), analytics beacons, the NBU exchange-rate API, and CoinGecko
+    // and Binance crypto prices (Ledger portfolio in the chat). Everything else is denied.
     "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com https://bank.gov.ua https://api.coingecko.com wss://stream.binance.com",
     // blob: is required by the service worker and by the generated PDFs,
     // which are opened via window.open(doc.output('bloburl')).
@@ -87,6 +95,13 @@ app.use((req, res, next) => {
     return;
   }
 
+  // The calculator, tax map and Ledger pages became tasks of the chat assistant.
+  const tool = LEGACY_TOOL_PAGE.exec(req.path)?.[1];
+  if (tool) {
+    res.redirect(301, `/${LOCALE}?topic=${LEGACY_TOOL_PAGES[tool]}`);
+    return;
+  }
+
   next();
 });
 
@@ -108,6 +123,19 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
+
+/**
+ * The chat agent (LangGraph supervisor + sub-agents). Conversations live in memory and are
+ * dropped together with their uploaded files when the thread expires.
+ */
+const conversations = new MemorySaver();
+app.use(
+  CHAT_API,
+  chatRouter({
+    agent: isAgentConfigured() ? buildTaxeredAgent(anthropicModels(), conversations) : null,
+    forgetThread: (threadId) => conversations.deleteThread(threadId),
+  }),
+);
 
 /**
  * sitemap.xml. The build also writes it to the browser output (scripts/write-sitemap.mjs)

@@ -1,0 +1,273 @@
+@let a = artifact().analysis;
+<div class="space-y-4">
+  <h3 class="text-lg font-semibold">{{ s.title }}: «{{ artifact().fileName }}»</h3>
+  @let f = formatters();
+  @let t = totals();
+
+  @if (a.skipped > 0) {
+    <div class="alert" role="note">
+      <svg [appIcon]="icons.Info" class="size-4"></svg>
+      <p>{{ s.skipped.replace('{count}', '' + a.skipped) }}</p>
+    </div>
+  }
+
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="card gap-1 px-6">
+      <p class="text-sm text-muted-foreground">{{ s.operations }}</p>
+      <p class="text-2xl font-semibold tabular-nums">{{ a.operations }}</p>
+      <p class="text-sm text-muted-foreground">
+        <span class="sr-only">{{ s.period }}: </span>{{ f.date(a.from) }} – {{ f.date(a.to) }}
+      </p>
+    </div>
+    <div class="card gap-1 px-6">
+      <p class="text-sm text-muted-foreground">{{ s.swaps }}</p>
+      <p class="text-2xl font-semibold tabular-nums">{{ swaps().length }}</p>
+      @if (linkedCount() > 0 && includeLinked()) {
+        <p class="text-sm text-muted-foreground">
+          {{ s.swapsHint.replace('{linked}', '' + linkedCount()) }}
+        </p>
+      }
+    </div>
+    <div class="card gap-1 px-6">
+      <p class="text-sm text-muted-foreground">{{ s.spread }}</p>
+      <p class="text-2xl font-semibold tabular-nums">{{ f.money(t.spread) }}</p>
+      <p class="text-sm text-muted-foreground">
+        {{ f.percent(t.spreadPercent) }} {{ s.spreadOf.replace('{volume}', f.money(t.given)) }}
+      </p>
+    </div>
+    <div class="card gap-1 px-6">
+      <p class="text-sm text-muted-foreground">{{ s.fees }}</p>
+      <p class="text-2xl font-semibold tabular-nums">{{ f.money(a.feeValue) }}</p>
+      <p class="text-sm text-muted-foreground">
+        {{ s.feesOf.replace('{count}', '' + feeTransactions()) }}
+      </p>
+    </div>
+  </div>
+
+  @if (linkedCount() > 0) {
+    <div class="space-y-1">
+      <label class="label cursor-pointer">
+        <input
+          type="checkbox"
+          class="size-4 accent-primary"
+          [id]="'include-linked-' + artifact().id"
+          [checked]="includeLinked()"
+          (change)="includeLinked.set($any($event.target).checked)"
+          [attr.aria-describedby]="'include-linked-hint-' + artifact().id"
+        />
+        {{ s.includeLinked }}
+      </label>
+      <p [id]="'include-linked-hint-' + artifact().id" class="text-sm text-muted-foreground">
+        {{ s.includeLinkedHint }}
+      </p>
+    </div>
+  }
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{{ s.pairsTitle }}</h4>
+      <p class="card-description">{{ s.pairsDescription }}</p>
+    </div>
+    <div class="card-content">
+      @if (pairs().length === 0) {
+        <p class="text-sm text-muted-foreground">{{ s.noSwaps }}</p>
+      } @else {
+        <div
+          class="overflow-x-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          tabindex="0"
+          role="region"
+          [attr.aria-label]="s.pairsTitle"
+        >
+          <table class="w-full text-sm tabular-nums">
+            <thead>
+              <tr class="border-b text-left text-muted-foreground">
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.pair }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.count }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.given }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.received }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.spread }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  {{ s.spreadPercent }}
+                </th>
+                <th scope="col" class="py-2 text-right font-medium">{{ s.fee }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of pairs(); track p.pair) {
+                <tr class="border-b last:border-0">
+                  <th scope="row" class="py-2 pr-4 text-left font-medium whitespace-nowrap">
+                    {{ p.pair }}
+                  </th>
+                  <td class="py-2 pr-4 text-right">{{ p.swaps }}</td>
+                  <td class="py-2 pr-4 text-right">{{ f.money(p.givenValue) }}</td>
+                  <td class="py-2 pr-4 text-right">{{ f.money(p.receivedValue) }}</td>
+                  <td
+                    class="py-2 pr-4 text-right font-semibold"
+                    [class.text-destructive]="p.spread > 0.005"
+                    [class.text-primary]="p.spread < -0.005"
+                  >
+                    {{ f.money(p.spread) }}
+                  </td>
+                  <td class="py-2 pr-4 text-right">{{ f.percent(p.spreadPercent) }}</td>
+                  <td class="py-2 text-right">{{ f.money(p.fee) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="border-t font-semibold">
+                <th scope="row" class="py-2 pr-4 text-left">{{ s.total }}</th>
+                <td class="py-2 pr-4 text-right">{{ swaps().length }}</td>
+                <td class="py-2 pr-4 text-right">{{ f.money(t.given) }}</td>
+                <td class="py-2 pr-4 text-right">{{ f.money(t.received) }}</td>
+                <td class="py-2 pr-4 text-right">{{ f.money(t.spread) }}</td>
+                <td class="py-2 pr-4 text-right">{{ f.percent(t.spreadPercent) }}</td>
+                <td class="py-2 text-right">{{ f.money(t.fee) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  @if (swaps().length > 0) {
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{{ s.swapsTitle }}</h4>
+        <p class="card-description">{{ s.swapsDescription }}</p>
+      </div>
+      <div class="card-content">
+        <div
+          class="max-h-[36rem] overflow-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          tabindex="0"
+          role="region"
+          [attr.aria-label]="s.swapsTitle"
+        >
+          <table class="w-full text-sm tabular-nums">
+            <thead class="sticky top-0 bg-card">
+              <tr class="border-b text-left text-muted-foreground">
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.date }}</th>
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.given }}</th>
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.received }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.spread }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  {{ s.spreadPercent }}
+                </th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.fee }}</th>
+                <th scope="col" class="py-2 font-medium">{{ s.kind }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (swap of swaps(); track swap.hashes.join()) {
+                <tr class="border-b align-top last:border-0">
+                  <td class="py-2 pr-4 whitespace-nowrap">{{ f.dateTime(swap.time) }}</td>
+                  <td class="py-2 pr-4">
+                    @for (leg of swap.given; track leg.ticker) {
+                      <div class="whitespace-nowrap">
+                        {{ f.amount(leg.amount) }} {{ leg.ticker }}
+                        <span class="text-muted-foreground">· {{ f.money(leg.value) }}</span>
+                      </div>
+                      <div class="text-xs text-muted-foreground">{{ leg.account }}</div>
+                    }
+                  </td>
+                  <td class="py-2 pr-4">
+                    @for (leg of swap.received; track leg.ticker) {
+                      <div class="whitespace-nowrap">
+                        {{ f.amount(leg.amount) }} {{ leg.ticker }}
+                        <span class="text-muted-foreground">· {{ f.money(leg.value) }}</span>
+                      </div>
+                      <div class="text-xs text-muted-foreground">{{ leg.account }}</div>
+                    }
+                  </td>
+                  <td
+                    class="py-2 pr-4 text-right font-semibold whitespace-nowrap"
+                    [class.text-destructive]="swap.spread > 0.005"
+                    [class.text-primary]="swap.spread < -0.005"
+                  >
+                    {{ f.money(swap.spread) }}
+                  </td>
+                  <td class="py-2 pr-4 text-right whitespace-nowrap">
+                    {{ f.percent(swap.spreadPercent) }}
+                  </td>
+                  <td class="py-2 pr-4 text-right whitespace-nowrap">
+                    {{ f.money(swap.fee) }}
+                  </td>
+                  <td class="py-2 whitespace-nowrap">
+                    <span class="badge" [title]="swap.hashes.join(', ')">
+                      {{ swap.kind === 'tx' ? s.kindTx : s.kindLinked }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  }
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{{ s.feesTitle }}</h4>
+      <p class="card-description">{{ s.feesDescription }}</p>
+    </div>
+    <div class="card-content">
+      @if (a.fees.length === 0) {
+        <p class="text-sm text-muted-foreground">{{ s.noFees }}</p>
+      } @else {
+        <div
+          class="overflow-x-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          tabindex="0"
+          role="region"
+          [attr.aria-label]="s.feesTitle"
+        >
+          <table class="w-full text-sm tabular-nums">
+            <thead>
+              <tr class="border-b text-left text-muted-foreground">
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.account }}</th>
+                <th scope="col" class="py-2 pr-4 font-medium">{{ s.asset }}</th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  {{ s.transactions }}
+                </th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">{{ s.amount }}</th>
+                <th scope="col" class="py-2 text-right font-medium">{{ a.fiat }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (fee of a.fees; track fee.account + fee.ticker) {
+                <tr class="border-b last:border-0">
+                  <th scope="row" class="py-2 pr-4 text-left font-medium">{{ fee.account }}</th>
+                  <td class="py-2 pr-4">{{ fee.ticker }}</td>
+                  <td class="py-2 pr-4 text-right">{{ fee.transactions }}</td>
+                  <td class="py-2 pr-4 text-right">{{ f.amount(fee.amount) }}</td>
+                  <td class="py-2 text-right">{{ f.money(fee.value) }}</td>
+                </tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr class="border-t font-semibold">
+                <th scope="row" colspan="2" class="py-2 pr-4 text-left">{{ s.total }}</th>
+                <td class="py-2 pr-4 text-right">{{ feeTransactions() }}</td>
+                <td class="py-2 pr-4"></td>
+                <td class="py-2 text-right">{{ f.money(a.feeValue) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      }
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{{ s.methodTitle }}</h4>
+    </div>
+    <div class="card-content">
+      <ul class="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+        @for (note of methodNotes(); track $index) {
+          <li>{{ note }}</li>
+        }
+      </ul>
+    </div>
+  </div>
+</div>

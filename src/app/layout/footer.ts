@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { UK } from '../core/i18n';
 import { localePath } from '../core/site';
-import { UA_TAX_FORMS } from '../declaration/tax-forms';
 
 @Component({
   selector: 'app-footer',
@@ -12,21 +11,22 @@ import { UA_TAX_FORMS } from '../declaration/tax-forms';
 })
 export class Footer {
   protected readonly s = UK.footer;
-  protected readonly forms = UA_TAX_FORMS;
+  /** What the assistant does; each link opens the chat with a matching prompt. */
+  protected readonly topics = [
+    { id: 'f1', title: 'Декларація Ф1 (F0121215)' },
+    { id: 'returns', title: UK.calculator.title },
+    { id: 'tax-map', title: UK.taxMap.title },
+    { id: 'spreads', title: UK.ledger.title },
+    { id: 'ledger', title: 'Портфель Ledger Live' },
+  ] as const;
   protected readonly helpTitle = UK.help.title;
-  protected readonly calculatorTitle = UK.calculator.title;
   protected readonly knowledgeTitle = UK.knowledge.base;
-  protected readonly taxMapTitle = UK.taxMap.nav;
-  protected readonly ledgerTitle = UK.ledger.title;
   protected readonly paths = {
     home: localePath(),
     about: localePath('about'),
     privacy: localePath('privacy'),
     terms: localePath('terms'),
     help: localePath('help'),
-    calculator: localePath('calculator'),
-    taxMap: localePath('tax-map'),
-    ledger: localePath('ledger'),
     knowledge: localePath('knowledge'),
   };
 
@@ -52,8 +52,8 @@ export class Footer {
       "Користувач несе повну особисту відповідальність за: (а) достовірність та точність усіх введених даних; (б) правильність заповнення податкових форм; (в) перевірку всіх розрахунків та згенерованих документів перед поданням; (г) відповідність поданих документів чинному законодавству України та/або країни податкового резидентства; (д) своєчасну сплату всіх податкових зобов'язань. КОРИСТУВАЧ ВИКОРИСТОВУЄ СЕРВІС НА ВЛАСНИЙ РИЗИК.",
     ],
     [
-      '6. ВІДСУТНІСТЬ ЗБЕРІГАННЯ ДАНИХ:',
-      'Всі розрахунки виконуються локально в браузері користувача. Власник сайту не зберігає, не обробляє та не передає персональні або податкові дані користувачів на свої сервери. Користувач несе відповідальність за збереження та захист згенерованих документів.',
+      '6. ОБРОБКА ДАНИХ:',
+      'Файли та повідомлення, надіслані в чат, обробляються на сервері сервісу й зберігаються лише в оперативній пам’яті до 2 годин; повідомлення та підсумки розрахунків передаються AI-моделі Claude (Anthropic). Відповіді AI можуть містити неточності. Користувач несе відповідальність за збереження та захист згенерованих документів.',
     ],
     [
       '7. ЗМІНИ ЗАКОНОДАВСТВА:',

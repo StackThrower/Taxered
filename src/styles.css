@@ -256,3 +256,48 @@
     @apply border border-border px-4 py-3 text-left;
   }
 }
+
+/* Answers of the chat assistant (Markdown from the model, sanitized by Angular). */
+.chat-markdown {
+  @apply space-y-3 leading-7 break-words;
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply mt-4 text-lg font-semibold;
+  }
+  ul {
+    @apply list-disc space-y-1 pl-6;
+  }
+  ol {
+    @apply list-decimal space-y-1 pl-6;
+  }
+  a {
+    @apply text-primary underline underline-offset-4 hover:decoration-2;
+  }
+  strong {
+    @apply font-semibold;
+  }
+  code {
+    @apply rounded bg-muted px-1.5 py-0.5 text-sm;
+  }
+  pre {
+    @apply overflow-x-auto rounded-lg bg-muted p-3 text-sm;
+  }
+  pre code {
+    @apply bg-transparent p-0;
+  }
+  blockquote {
+    @apply border-l-4 border-primary pl-4 text-muted-foreground;
+  }
+  table {
+    @apply block w-full overflow-x-auto text-sm tabular-nums;
+  }
+  th,
+  td {
+    @apply border-b border-border px-3 py-1.5 text-left;
+  }
+  th {
+    @apply font-semibold;
+  }
+}

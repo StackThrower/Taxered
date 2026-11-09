@@ -8,7 +8,7 @@ import {
   getCountry,
   rateBin,
 } from './tax-data';
-import { COUNTRY_SHAPES } from './world-shapes';
+import { COUNTRY_SHAPES } from '../widgets/tax-map/world-shapes';
 
 describe('tax map data', () => {
   it('has unique country codes', () => {

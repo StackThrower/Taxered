@@ -9,6 +9,24 @@ resource "google_project_service" "artifact_registry" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "secret_manager" {
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+data "google_project" "current" {}
+
+# The chat agent reads its Anthropic API key from Secret Manager (created outside Terraform,
+# so the key never lands in the state file).
+resource "google_secret_manager_secret_iam_member" "anthropic_key_access" {
+  count     = var.anthropic_api_key_secret == "" ? 0 : 1
+  secret_id = var.anthropic_api_key_secret
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${data.google_project.current.number}-compute@developer.gserviceaccount.com"
+
+  depends_on = [google_project_service.secret_manager]
+}
+
 resource "google_project_service" "cloud_build" {
   service            = "cloudbuild.googleapis.com"
   disable_on_destroy = false
@@ -44,12 +62,31 @@ resource "google_cloud_run_v2_service" "app" {
         }
       }
 
-      # Environment variables (add as needed)
-      # env {
-      #   name  = "NODE_ENV"
-      #   value = "production"
-      # }
+      dynamic "env" {
+        for_each = var.anthropic_api_key_secret == "" ? [] : [var.anthropic_api_key_secret]
+        content {
+          name = "ANTHROPIC_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = env.value
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      env {
+        name  = "TAXERED_MODEL"
+        value = var.agent_model
+      }
     }
+
+    # Chat threads (uploaded files, conversation) live in the memory of one instance; affinity
+    # keeps a browser on the instance that holds its thread.
+    session_affinity = true
+
+    # Answers stream for minutes while the agent works.
+    timeout = "900s"
 
     scaling {
       max_instance_count = var.max_instances

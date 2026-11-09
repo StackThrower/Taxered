@@ -45,7 +45,26 @@ interface FormData {
   calculationNotes?: readonly string[];
 }
 
+/** Builds the workbook and downloads it (browser). */
 export function generateTaxCalculationExcel(formData: FormData, language: string = 'uk') {
+  const { wb, fileName } = buildTaxCalculationWorkbook(formData, language);
+  XLSX.writeFile(wb, fileName);
+}
+
+/** The workbook as .xlsx bytes with its file name (server, chat agent). */
+export function renderTaxCalculationExcel(
+  formData: FormData,
+  language: string = 'uk',
+): { bytes: Uint8Array; fileName: string } {
+  const { wb, fileName } = buildTaxCalculationWorkbook(formData, language);
+  const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  return { bytes: new Uint8Array(bytes), fileName };
+}
+
+function buildTaxCalculationWorkbook(
+  formData: FormData,
+  language: string,
+): { wb: XLSX.WorkBook; fileName: string } {
   // Create a new workbook
   const wb = XLSX.utils.book_new();
 
@@ -445,9 +464,8 @@ export function generateTaxCalculationExcel(formData: FormData, language: string
 
   XLSX.utils.book_append_sheet(wb, wsBreakdown, t.breakdownSheet);
 
-  // Generate and download the file
   const fileName = `${t.fileName}_${formData.fullName.replace(/\s+/g, '_')}_${formData.year}.xlsx`;
-  XLSX.writeFile(wb, fileName);
+  return { wb, fileName };
 }
 
 function getAssetTypeLabel(assetType: string, language: string): string {

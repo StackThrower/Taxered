@@ -3,9 +3,6 @@ import { RenderMode, ServerRoute } from '@angular/ssr';
 const STATIC_PAGES = [
   '',
   'uk-ua',
-  'uk-ua/calculator',
-  'uk-ua/tax-map',
-  'uk-ua/ledger',
   'uk-ua/about',
   'uk-ua/help',
   'uk-ua/privacy',

@@ -14,7 +14,25 @@ let fontCache: { normal: string; bold: string } | null = null;
  * This version loads fonts from the public directory at runtime
  * Fonts are registered for EACH new PDF document
  */
-export async function setupUkrainianFonts(doc: jsPDF): Promise<boolean> {
+/** Reads the regular and bold DejaVu Sans TTF files; the server reads them from disk. */
+export type FontLoader = () => Promise<{ normal: ArrayBuffer; bold: ArrayBuffer } | null>;
+
+/** Browser default: the fonts are served from the public directory. */
+const fetchFonts: FontLoader = async () => {
+  const [normal, bold] = await Promise.all([
+    fetch('/fonts/DejaVuSans.ttf'),
+    fetch('/fonts/DejaVuSans-Bold.ttf'),
+  ]);
+  if (!normal.ok || !bold.ok) {
+    return null;
+  }
+  return { normal: await normal.arrayBuffer(), bold: await bold.arrayBuffer() };
+};
+
+export async function setupUkrainianFonts(
+  doc: jsPDF,
+  loadFonts: FontLoader = fetchFonts,
+): Promise<boolean> {
   try {
     let normalBase64: string;
     let boldBase64: string;
@@ -25,23 +43,15 @@ export async function setupUkrainianFonts(doc: jsPDF): Promise<boolean> {
       boldBase64 = fontCache.bold;
       console.log('📦 Using cached Ukrainian fonts');
     } else {
-      // Download fonts from public directory
-      const [normalResponse, boldResponse] = await Promise.all([
-        fetch('/fonts/DejaVuSans.ttf'),
-        fetch('/fonts/DejaVuSans-Bold.ttf'),
-      ]);
-
-      if (!normalResponse.ok || !boldResponse.ok) {
+      const fonts = await loadFonts();
+      if (!fonts) {
         console.error('Failed to load font files');
         return false;
       }
 
-      const normalBuffer = await normalResponse.arrayBuffer();
-      const boldBuffer = await boldResponse.arrayBuffer();
-
       // Convert to base64
-      normalBase64 = arrayBufferToBase64(normalBuffer);
-      boldBase64 = arrayBufferToBase64(boldBuffer);
+      normalBase64 = arrayBufferToBase64(fonts.normal);
+      boldBase64 = arrayBufferToBase64(fonts.bold);
 
       // Cache the font data for future use
       fontCache = { normal: normalBase64, bold: boldBase64 };

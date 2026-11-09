@@ -1,5 +1,5 @@
 /**
- * Generates `src/app/pages/tax-map/world-shapes.ts`: projected SVG paths of the countries on
+ * Generates `src/app/widgets/tax-map/world-shapes.ts`: projected SVG paths of the countries on
  * the investment tax map, one merged background path for every other country, and view boxes
  * for the region views. Run with `npm run world-map` after changing the country list.
  *
@@ -12,7 +12,7 @@ import { feature, merge } from 'topojson-client';
 import { presimplify, quantile, simplify, sphericalTriangleArea } from 'topojson-simplify';
 import source from 'world-atlas/countries-50m.json' with { type: 'json' };
 
-const OUT = new URL('../src/app/pages/tax-map/world-shapes.ts', import.meta.url);
+const OUT = new URL('../src/app/widgets/tax-map/world-shapes.ts', import.meta.url);
 const WIDTH = 1000;
 /** Points closer than this (in projected units) to the previous one are dropped. */
 const MIN_STEP = 0.12;

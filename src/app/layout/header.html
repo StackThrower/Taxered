@@ -19,15 +19,11 @@
     </a>
 
     <nav class="hidden gap-6 lg:flex" [attr.aria-label]="s.mainNav">
-      <a
-        [routerLink]="homePath"
-        fragment="forms"
-        class="whitespace-nowrap underline-offset-4 hover:underline"
-      >
-        {{ s.forms }}
+      <a [routerLink]="homePath" class="whitespace-nowrap underline-offset-4 hover:underline">
+        {{ s.assistant }}
       </a>
-      <a [routerLink]="calculatorPath" class="whitespace-nowrap underline-offset-4 hover:underline">
-        {{ s.calculator }}
+      <a [routerLink]="knowledgePath" class="whitespace-nowrap underline-offset-4 hover:underline">
+        {{ s.knowledge }}
       </a>
       <a [routerLink]="helpPath" class="whitespace-nowrap underline-offset-4 hover:underline">
         {{ s.help }}
@@ -77,24 +73,23 @@
     <nav class="flex flex-col gap-2 px-6 py-6" [attr.aria-label]="s.mainNav">
       <a
         [routerLink]="homePath"
-        fragment="forms"
         class="group flex items-center gap-4 rounded-lg px-4 py-3.5 text-base font-medium transition-colors hover:bg-muted"
         (click)="closeMenu()"
       >
         <span class="flex size-9 items-center justify-center rounded-lg bg-primary/10">
-          <svg [appIcon]="icons.FileText" class="size-4 text-primary"></svg>
+          <svg [appIcon]="icons.MessageSquare" class="size-4 text-primary"></svg>
         </span>
-        <span class="flex-1">{{ s.forms }}</span>
+        <span class="flex-1">{{ s.assistant }}</span>
       </a>
       <a
-        [routerLink]="calculatorPath"
+        [routerLink]="knowledgePath"
         class="group flex items-center gap-4 rounded-lg px-4 py-3.5 text-base font-medium transition-colors hover:bg-muted"
         (click)="closeMenu()"
       >
         <span class="flex size-9 items-center justify-center rounded-lg bg-accent/10">
-          <svg [appIcon]="icons.Calculator" class="size-4 text-accent"></svg>
+          <svg [appIcon]="icons.BookOpen" class="size-4 text-accent"></svg>
         </span>
-        <span class="flex-1">{{ s.calculator }}</span>
+        <span class="flex-1">{{ s.knowledge }}</span>
       </a>
       <a
         [routerLink]="helpPath"

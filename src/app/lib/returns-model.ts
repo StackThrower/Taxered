@@ -1,5 +1,5 @@
-import { taxesOnIncome } from '../../declaration/f0121214/tax-model';
-import { inflationFor } from '../../lib/inflation';
+import { taxesOnIncome } from '../declaration/f0121214/tax-model';
+import { inflationFor } from './inflation';
 
 export type DisplayCurrency = 'USD' | 'UAH';
 

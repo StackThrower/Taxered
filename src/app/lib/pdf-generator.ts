@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { setupUkrainianFonts } from './pdf-fonts';
+import { setupUkrainianFonts, type FontLoader } from './pdf-fonts';
 
 export interface F0121214Position {
   id: string;
@@ -43,18 +43,41 @@ export interface F0121214Data {
   };
 }
 
+/** Saves the PDF and opens it in a new tab (browser). */
 export const generateF0121214PDF = async (
   data: F0121214Data,
   language: string = 'uk',
   createCopy: boolean = true,
 ) => {
+  const { doc, filename } = await buildF0121214PDF(data, language, createCopy);
+  doc.save(filename);
+  window.open(doc.output('bloburl'), '_blank');
+};
+
+/** The PDF as bytes with its file name (server, chat agent). */
+export async function renderF0121214PDF(
+  data: F0121214Data,
+  loadFonts: FontLoader,
+  language: string = 'uk',
+  createCopy: boolean = true,
+): Promise<{ bytes: Uint8Array; filename: string }> {
+  const { doc, filename } = await buildF0121214PDF(data, language, createCopy, loadFonts);
+  return { bytes: new Uint8Array(doc.output('arraybuffer')), filename };
+}
+
+async function buildF0121214PDF(
+  data: F0121214Data,
+  language: string,
+  createCopy: boolean,
+  loadFonts?: FontLoader,
+): Promise<{ doc: jsPDF; filename: string }> {
   const doc = new jsPDF();
   // jspdf-autotable records where the last table ended on the document.
   const lastTableEnd = () =>
     (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
 
   // Setup Ukrainian fonts for Cyrillic support
-  await setupUkrainianFonts(doc);
+  await setupUkrainianFonts(doc, loadFonts);
 
   // Ставка военного сбора: 1.5% для года ≤2024, 5% для года ≥2025
   const reportYear = parseInt(data.year) || 2026;
@@ -558,7 +581,5 @@ export const generateF0121214PDF = async (
   const timestamp = new Date().toISOString().split('T')[0];
   const filename = `F0121215_${data.taxNumber || 'NN'}_${data.year}_${timestamp}.pdf`;
 
-  // Save and open
-  doc.save(filename);
-  window.open(doc.output('bloburl'), '_blank');
-};
+  return { doc, filename };
+}

@@ -4,8 +4,11 @@ import {
   DestroyRef,
   ElementRef,
   computed,
+  effect,
   inject,
+  input,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
@@ -49,6 +52,13 @@ const F1_ASSET_CODES = [
   { value: '3', label: 'цінні папери / деривативи не на фондовій біржі' },
   { value: '4', label: 'інвестиційні активи з джерел за межами України' },
 ] as const;
+
+/** A calculation to open in the form, e.g. one the chat agent made. */
+export interface F1Seed {
+  year: string;
+  positions: readonly FinancialPosition[];
+  options: TaxOptions;
+}
 
 type PositionGroup = FormGroup<{
   [K in keyof Required<FinancialPosition>]: FormControl<FinancialPosition[K]>;
@@ -109,6 +119,9 @@ function hasData(p: FinancialPosition): boolean {
 })
 export class FormF0121214 {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /** Positions and options to start from instead of an empty form. */
+  readonly seed = input<F1Seed | null>(null);
 
   protected readonly icons = {
     FileCode,
@@ -205,6 +218,13 @@ export class FormF0121214 {
   private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
 
   constructor() {
+    effect(() => {
+      const seed = this.seed();
+      if (seed) {
+        untracked(() => this.applySeed(seed));
+      }
+    });
+
     const { fullName, taxNumber, taxOfficeCode, anonymous } = this.form.controls;
     fullName.addValidators(Validators.required);
     taxNumber.addValidators(Validators.required);
@@ -499,6 +519,18 @@ export class FormF0121214 {
       this.importStatus.set('');
       input.value = '';
     }
+  }
+
+  private applySeed({ year, positions, options }: F1Seed): void {
+    this.form.patchValue({
+      year,
+      previousYearsLoss: options.previousYearsLoss ?? '',
+      withheldPdfo: options.withheldPdfo ?? '',
+      withheldMilitaryLevy: options.withheldMilitaryLevy ?? '',
+      hasForeignTaxCertificate: !!options.foreignTaxCredit,
+      foreignTaxCredit: options.foreignTaxCredit ?? '',
+    });
+    this.replacePositions(positions.length > 0 ? [...positions] : [this.emptyPosition()]);
   }
 
   private replacePositions(positions: FinancialPosition[]): void {

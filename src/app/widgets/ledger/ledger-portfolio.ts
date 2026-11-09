@@ -24,8 +24,8 @@ import {
   portfolioHistory,
 } from '../../lib/ledger-portfolio';
 import { Icon } from '../../shared/icon';
-import { ChartSeries } from '../calculator/chart-utils';
-import { LineChart } from '../calculator/line-chart';
+import { ChartSeries } from '../charts/chart-utils';
+import { LineChart } from '../charts/line-chart';
 import { LedgerFormatters } from './format';
 
 const MARKET_REFRESH_MS = 60_000;

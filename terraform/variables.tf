@@ -24,7 +24,7 @@ variable "container_port" {
 variable "memory" {
   description = "Memory allocated to each Cloud Run instance"
   type        = string
-  default     = "512Mi"
+  default     = "1Gi"
 }
 
 variable "cpu" {
@@ -45,3 +45,15 @@ variable "min_instances" {
   default     = 0
 }
 
+
+variable "anthropic_api_key_secret" {
+  description = "Secret Manager secret id holding ANTHROPIC_API_KEY for the chat agent; empty disables the agent"
+  type        = string
+  default     = ""
+}
+
+variable "agent_model" {
+  description = "Claude model of the chat agent"
+  type        = string
+  default     = "claude-opus-5-5"
+}

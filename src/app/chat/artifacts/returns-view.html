@@ -1,0 +1,259 @@
+<div class="space-y-4">
+  @let a = analysis();
+  @let uah = currency() === 'UAH';
+  <h3 class="text-lg font-semibold">{{ s.resultsTitle }}</h3>
+
+  <div
+    class="grid gap-4 sm:grid-cols-2"
+    [class]="uah && a.hasCapital ? 'lg:grid-cols-5' : 'lg:grid-cols-4'"
+  >
+    @if (a.hasCapital) {
+      <div class="card gap-1 border-primary px-6 sm:col-span-2 lg:col-span-1">
+        <p class="flex items-center gap-1 text-sm text-muted-foreground">
+          {{ s.realGain }} <app-info-hint [label]="s.realGain" [text]="h.realGain" />
+        </p>
+        <p class="text-3xl font-bold">{{ signedMoney()(a.realGain) }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ signedMoney()(a.realGainInStartPrices) }} {{ s.realGainHint }}
+          {{ a.rows[0].year }}
+        </p>
+      </div>
+      <div class="card gap-1 px-6">
+        <p class="flex items-center gap-1 text-sm text-muted-foreground">
+          {{ s.avgReal }} <app-info-hint [label]="s.avgReal" [text]="h.avgReal" />
+        </p>
+        <p class="text-2xl font-semibold">{{ percent(a.avgRealReturnPct) }}</p>
+        <p class="text-sm text-muted-foreground">{{ s.perYear }}</p>
+      </div>
+    }
+    <div class="card gap-1 px-6">
+      <p class="flex items-center gap-1 text-sm text-muted-foreground">
+        {{ s.totalNet }}
+        <app-info-hint [label]="s.totalNet" [text]="uah ? h.totalNetUah : h.totalNetUsd" />
+      </p>
+      <p class="text-2xl font-semibold">{{ signedMoney()(a.net) }}</p>
+      @if (a.unrealized !== 0) {
+        <p class="text-sm text-muted-foreground">
+          {{ s.unrealizedPart }}: {{ signedMoney()(a.unrealized) }}
+        </p>
+      }
+    </div>
+    @if (uah) {
+      <div class="card gap-1 px-6">
+        <p class="flex items-center gap-1 text-sm text-muted-foreground">
+          {{ s.fxTotal }} <app-info-hint [label]="s.fxTotal" [text]="h.fxTotal" />
+        </p>
+        <p class="text-2xl font-semibold">{{ signedMoney()(a.fx) }}</p>
+        <p class="text-sm text-muted-foreground">{{ s.fxHint }}</p>
+      </div>
+    }
+    <div class="card gap-1 px-6">
+      <p class="flex items-center gap-1 text-sm text-muted-foreground">
+        {{ s.totalTax }} <app-info-hint [label]="s.totalTax" [text]="h.totalTax" />
+      </p>
+      <p class="text-2xl font-semibold">{{ money()(a.tax) }}</p>
+      @if (a.taxOnFx > 0.5) {
+        <p class="text-sm text-muted-foreground">{{ s.taxOnFx }}: {{ money()(a.taxOnFx) }}</p>
+      }
+    </div>
+  </div>
+
+  @if (!a.hasCapital) {
+    <div class="alert" role="note">
+      <svg [appIcon]="icons.AlertCircle" class="size-4"></svg>
+      <p>{{ s.needCapital }}</p>
+    </div>
+  }
+
+  @let rc = returnsChart();
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{{ s.returnsChartTitle }}</h4>
+      <p class="card-description">
+        {{ rc.hasCapital ? s.returnsChartPercent : s.returnsChartAmount }}
+      </p>
+    </div>
+    <div class="card-content">
+      <app-bar-chart
+        [categories]="rc.categories"
+        [series]="rc.series"
+        [label]="s.returnsChartTitle"
+        [format]="rc.hasCapital ? percent : signedMoney()"
+        [axisFormat]="rc.hasCapital ? axisPercent : compactMoney()"
+      />
+    </div>
+  </div>
+
+  @if (a.hasCapital) {
+    @let cc = capitalChart();
+    <div class="card">
+      <div class="card-header">
+        <h4 class="card-title">{{ s.capitalChartTitle }}</h4>
+        <p class="card-description">{{ s.capitalChartDescription }}</p>
+      </div>
+      <div class="card-content">
+        <app-line-chart
+          [labels]="cc.labels"
+          [series]="cc.series"
+          [label]="s.capitalChartTitle"
+          [format]="money()"
+          [axisFormat]="compactMoney()"
+          [detail]="cc.detail"
+          [fillBetween]="true"
+        />
+      </div>
+    </div>
+  }
+
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title">{{ s.tableTitle }}</h4>
+    </div>
+    <div class="card-content">
+      <div
+        class="overflow-x-auto rounded-sm focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+        tabindex="0"
+        role="region"
+        [attr.aria-label]="s.tableTitle"
+      >
+        <table class="w-full text-sm tabular-nums">
+          <thead>
+            <tr class="border-b text-left text-muted-foreground">
+              <th scope="col" class="py-2 pr-4 font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.year }} <app-info-hint [label]="s.year" [text]="h.year" />
+                </div>
+              </th>
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colTrades }}
+                  <app-info-hint [label]="s.colTrades" [text]="uah ? h.tradesUah : h.tradesUsd" />
+                </div>
+              </th>
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colDividends }}
+                  <app-info-hint
+                    [label]="s.colDividends"
+                    [text]="uah ? h.dividendsUah : h.dividendsUsd"
+                  />
+                </div>
+              </th>
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colUnrealized }}
+                  <app-info-hint
+                    [label]="s.colUnrealized"
+                    [text]="uah ? h.unrealizedUah : h.unrealizedUsd"
+                  />
+                </div>
+              </th>
+              @if (uah) {
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  <div class="inline-flex items-center gap-1">
+                    {{ s.colFx }} <app-info-hint [label]="s.colFx" [text]="h.fx" />
+                  </div>
+                </th>
+              }
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colTax }}
+                  <app-info-hint [label]="s.colTax" [text]="uah ? h.taxUah : h.taxUsd" />
+                </div>
+              </th>
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colNet }}
+                  <app-info-hint [label]="s.colNet" [text]="uah ? h.netUah : h.netUsd" />
+                </div>
+              </th>
+              @if (a.hasCapital) {
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  <div class="inline-flex items-center gap-1">
+                    {{ s.colStart }} <app-info-hint [label]="s.colStart" [text]="h.start" />
+                  </div>
+                </th>
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  <div class="inline-flex items-center gap-1">
+                    {{ s.colReturn }} <app-info-hint [label]="s.colReturn" [text]="h.return" />
+                  </div>
+                </th>
+              }
+              <th scope="col" class="py-2 pr-4 text-right font-medium">
+                <div class="inline-flex items-center gap-1">
+                  {{ s.colInflation }}
+                  <app-info-hint [label]="s.colInflation" [text]="h.inflation" />
+                </div>
+              </th>
+              @if (a.hasCapital) {
+                <th scope="col" class="py-2 pr-4 text-right font-medium">
+                  <div class="inline-flex items-center gap-1">
+                    {{ s.colReal }} <app-info-hint [label]="s.colReal" [text]="h.real" />
+                  </div>
+                </th>
+                <th scope="col" class="py-2 text-right font-medium">
+                  <div class="inline-flex items-center gap-1">
+                    {{ s.colAbove }} <app-info-hint [label]="s.colAbove" [text]="h.above" />
+                  </div>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of a.rows; track r.year) {
+              <tr class="border-b">
+                <th scope="row" class="py-2 pr-4 text-left font-medium">
+                  {{ r.year }}
+                  @if (r.missing) {
+                    <span class="block text-xs font-normal text-muted-foreground">{{
+                      s.missingYear
+                    }}</span>
+                  }
+                </th>
+                <td class="py-2 pr-4 text-right">{{ money()(r.trades) }}</td>
+                <td class="py-2 pr-4 text-right">{{ money()(r.dividends) }}</td>
+                <td class="py-2 pr-4 text-right">{{ signedMoney()(r.unrealized) }}</td>
+                @if (uah) {
+                  <td class="py-2 pr-4 text-right">{{ signedMoney()(r.fx) }}</td>
+                }
+                <td class="py-2 pr-4 text-right">{{ money()(r.tax) }}</td>
+                <td class="py-2 pr-4 text-right font-semibold">{{ money()(r.net) }}</td>
+                @if (a.hasCapital) {
+                  <td class="py-2 pr-4 text-right">
+                    {{ money()(r.startCapital + r.deposits) }}
+                  </td>
+                  <td class="py-2 pr-4 text-right">{{ percent(r.returnPct) }}</td>
+                }
+                <td class="py-2 pr-4 text-right">{{ percent(r.inflation) }}</td>
+                @if (a.hasCapital) {
+                  <td class="py-2 pr-4 text-right font-semibold">
+                    {{ percent(r.realReturnPct) }}
+                  </td>
+                  <td class="py-2 text-right">{{ signedMoney()(r.aboveInflation) }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+          <tfoot>
+            <tr class="font-semibold">
+              <th scope="row" class="py-2 pr-4 text-left">{{ s.total }}</th>
+              <td class="py-2 pr-4 text-right" colspan="2">{{ money()(a.gross) }}</td>
+              <td class="py-2 pr-4 text-right">{{ signedMoney()(a.unrealized) }}</td>
+              @if (uah) {
+                <td class="py-2 pr-4 text-right">{{ signedMoney()(a.fx) }}</td>
+              }
+              <td class="py-2 pr-4 text-right">{{ money()(a.tax) }}</td>
+              <td class="py-2 pr-4 text-right">{{ money()(a.net) }}</td>
+              @if (a.hasCapital) {
+                <td class="py-2 pr-4" colspan="4"></td>
+                <td class="py-2 text-right">{{ signedMoney()(a.realGain) }}</td>
+              } @else {
+                <td class="py-2"></td>
+              }
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
