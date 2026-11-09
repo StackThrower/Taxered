@@ -98,9 +98,14 @@ export function scriptedModels(scripts: Partial<Record<AgentRole, ScriptStep[]>>
   instances: Map<AgentRole, ScriptedChatModel>;
 } {
   const instances = new Map<AgentRole, ScriptedChatModel>();
+  // One instance per role, shared by every agent built from this factory, so a script
+  // continues across server instances (as across serverless invocations).
   const models: ModelFactory = (role) => {
-    const model = new ScriptedChatModel(scripts[role] ?? [], [roleTag(role)]);
-    instances.set(role, model);
+    let model = instances.get(role);
+    if (!model) {
+      model = new ScriptedChatModel(scripts[role] ?? [], [roleTag(role)]);
+      instances.set(role, model);
+    }
     return model;
   };
   return { models, instances };

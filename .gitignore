@@ -52,3 +52,6 @@ terraform/.terraform/
 
 # Knowledge-base articles compiled by scripts/build-articles.mjs
 /src/app/pages/knowledge/generated
+
+# Vercel (Build Output API, CLI link)
+.vercel

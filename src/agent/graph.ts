@@ -8,13 +8,11 @@
  *                       ├─ ask_spreads_agent ──► Ledger CSV: swap spreads, network fees
  *                       └─ ask_ledger_agent ───► Ledger CSV: portfolio, holdings, history
  *
- * Only the supervisor keeps a conversation (checkpointed per thread, append-only). Each
+ * Only the supervisor keeps a conversation (stored per thread, append-only). Each
  * delegation runs a sub-agent on a fresh task, so its tool calls never enter the supervisor's
  * history; the sub-agent's final report comes back as the tool result. Artifacts (forms,
  * charts, files) leave the tools as custom events and go straight to the browser.
  */
-import type { BaseCheckpointSaver } from '@langchain/langgraph';
-import { MemorySaver } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
 import { tool, type ClientTool } from '@langchain/core/tools';
 import { createAgent } from 'langchain';
@@ -109,10 +107,11 @@ export function delegateToolName(name: AgentName): string {
   return `ask_${name}_agent`;
 }
 
-export function buildTaxeredAgent(
-  models: ModelFactory,
-  checkpointer: BaseCheckpointSaver = new MemorySaver(),
-) {
+/**
+ * The conversation is passed in and read back by the caller (`http.ts`), which keeps it in the
+ * thread store; nothing is held between requests, so this also runs in serverless functions.
+ */
+export function buildTaxeredAgent(models: ModelFactory) {
   const delegates = (Object.keys(SUBAGENTS) as AgentName[]).map((name) => {
     const spec = SUBAGENTS[name];
     const subagent = createAgent({
@@ -162,7 +161,6 @@ export function buildTaxeredAgent(
     model: models('supervisor'),
     tools,
     systemPrompt: SUPERVISOR_PROMPT,
-    checkpointer,
     name: 'taxered_supervisor',
   });
 }

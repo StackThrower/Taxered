@@ -42,7 +42,7 @@ function legs(swap: Swap, side: 'given' | 'received'): string {
 const analyzeSpreads = tool(
   async ({ fileId, includeLinked }, config) => {
     const session = sessionOf(config);
-    const ledger = loadLedgerFile(session, fileId);
+    const ledger = await loadLedgerFile(session, fileId);
     const { analysis } = ledger;
     const linked = includeLinked ?? true;
     const swaps = selectSwaps(analysis.swaps, linked);
@@ -117,7 +117,7 @@ const analyzeSpreads = tool(
 const exportSpreads = tool(
   async ({ fileId, includeLinked }, config) => {
     const session = sessionOf(config);
-    const { file, analysis } = loadLedgerFile(session, fileId);
+    const { file, analysis } = await loadLedgerFile(session, fileId);
     const swaps = selectSwaps(analysis.swaps, includeLinked ?? true);
     const fiat = analysis.fiat;
     const wb = XLSX.utils.book_new();

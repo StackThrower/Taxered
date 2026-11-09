@@ -16,15 +16,17 @@ export interface LedgerFile {
   note?: string;
 }
 
-export function loadLedgerFile(session: Session, fileId: string | undefined): LedgerFile {
-  const files = pickFiles(session, fileId ? [fileId] : undefined, ['ledger_csv']);
+export async function loadLedgerFile(
+  session: Session,
+  fileId: string | undefined,
+): Promise<LedgerFile> {
+  const files = await pickFiles(session, fileId ? [fileId] : undefined, ['ledger_csv']);
   const file = files[files.length - 1];
   const operations = parseLedgerCsv(file.content);
   const analysis = analyzeLedger(operations);
   if (analysis.operations === 0) {
     throw new Error(`У «${file.name}» немає підтверджених операцій.`);
   }
-  session.ledger = { fileName: file.name, analysis };
   return {
     file,
     operations,

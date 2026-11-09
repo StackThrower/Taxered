@@ -53,7 +53,7 @@ function portfolio(ledger: LedgerFile, prices: Map<string, MarketPrice>) {
 const analyzePortfolio = tool(
   async ({ fileId }, config) => {
     const session = sessionOf(config);
-    const ledger = loadLedgerFile(session, fileId);
+    const ledger = await loadLedgerFile(session, fileId);
     const { prices, warning } = await marketPrices(ledger);
     const { holdings, history } = portfolio(ledger, prices);
     const value = holdings.reduce((sum, h) => sum + h.value, 0);
@@ -106,7 +106,7 @@ const analyzePortfolio = tool(
 const exportPortfolio = tool(
   async ({ fileId }, config) => {
     const session = sessionOf(config);
-    const ledger = loadLedgerFile(session, fileId);
+    const ledger = await loadLedgerFile(session, fileId);
     const { prices } = await marketPrices(ledger);
     const { holdings, history } = portfolio(ledger, prices);
     const fiat = ledger.analysis.fiat;

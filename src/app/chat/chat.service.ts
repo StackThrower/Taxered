@@ -37,6 +37,24 @@ function newThreadId(): string {
 }
 
 /**
+ * Sent with every API request: the Angular service worker then leaves it to the network,
+ * so a failed request shows its real status instead of the worker's generic 504.
+ */
+const BYPASS_WORKER = { 'ngsw-bypass': 'true' };
+
+/** Serverless hosts (Vercel) refuse request bodies over 4.5 MB; compressed uploads fit. */
+const MAX_UPLOAD_BODY = 4 * 1024 * 1024;
+
+/** The file gzip-compressed (XML and CSV shrink about tenfold), or as is without support. */
+async function compress(file: File): Promise<{ body: Blob; encoding: string | null }> {
+  if (typeof CompressionStream === 'undefined') {
+    return { body: file, encoding: null };
+  }
+  const body = await new Response(file.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  return { body, encoding: 'gzip' };
+}
+
+/**
  * One chat thread with the Taxered agent: uploads files, sends messages and applies the
  * server-sent events of each answer (status, text, artifacts) to the message list.
  */
@@ -75,10 +93,19 @@ export class ChatService {
       return;
     }
     try {
+      const { body: data, encoding } = await compress(file);
+      if (data.size > MAX_UPLOAD_BODY) {
+        add({ state: 'failed', error: 'Файл завеликий для завантаження.' });
+        return;
+      }
       const response = await fetch(`${CHAT_API}/threads/${this.threadId}/files`, {
         method: 'POST',
-        headers: { 'X-File-Name': encodeURIComponent(file.name) },
-        body: file,
+        headers: {
+          ...BYPASS_WORKER,
+          'X-File-Name': encodeURIComponent(file.name),
+          ...(encoding && { 'Content-Encoding': encoding }),
+        },
+        body: data,
       });
       const body = (await response.json()) as UploadedFile | { error: string };
       if (!response.ok || 'error' in body) {
@@ -133,7 +160,7 @@ export class ChatService {
     try {
       const response = await fetch(`${CHAT_API}/threads/${this.threadId}/messages`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { ...BYPASS_WORKER, 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, fileIds: files.map((f) => f.id) }),
         signal: this.abort.signal,
       });
@@ -163,9 +190,10 @@ export class ChatService {
   reset(): void {
     this.stop();
     if (this.browser) {
-      void fetch(`${CHAT_API}/threads/${this.threadId}`, { method: 'DELETE' }).catch(
-        () => undefined,
-      );
+      void fetch(`${CHAT_API}/threads/${this.threadId}`, {
+        method: 'DELETE',
+        headers: BYPASS_WORKER,
+      }).catch(() => undefined);
       this.threadId = newThreadId();
     }
     this.messages.set([]);

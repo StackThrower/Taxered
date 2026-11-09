@@ -4,12 +4,13 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
-import { MemorySaver } from '@langchain/langgraph';
 import express from 'express';
 import { basename, join } from 'node:path';
 import { buildTaxeredAgent } from './agent/graph';
-import { chatRouter } from './agent/http';
+import { DEFAULT_MAX_RUN_MS, chatRouter } from './agent/http';
 import { anthropicModels, isAgentConfigured } from './agent/model';
+import { RedisThreadStore, redisFromEnv } from './agent/store/redis-store';
+import { MemoryThreadStore } from './agent/store/thread-store';
 import { CHAT_API } from './app/chat/protocol';
 import { LEGACY_TOOL_PAGES } from './app/app.routes';
 import { LOCALE, SITE_URL } from './app/core/site';
@@ -106,34 +107,52 @@ app.use((req, res, next) => {
 });
 
 /**
- * Security headers for every response.
+ * Security headers for every response. Exported so the Vercel build applies the same ones to
+ * the files the CDN serves without running this server (scripts/vercel-output.mjs).
  */
+export function securityHeaders(isLocal: boolean): Record<string, string> {
+  return {
+    'Content-Security-Policy': contentSecurityPolicy(isLocal),
+    'X-DNS-Prefetch-Control': 'on',
+    ...(isLocal
+      ? {}
+      : { 'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload' }),
+    'X-Frame-Options': 'SAMEORIGIN',
+    'X-Content-Type-Options': 'nosniff',
+    // The legacy XSS auditor is disabled on purpose; CSP above is the real control.
+    'X-XSS-Protection': '0',
+    'Referrer-Policy': 'origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  };
+}
+
 app.use((req, res, next) => {
   const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  res.setHeader('Content-Security-Policy', contentSecurityPolicy(isLocal));
-  res.setHeader('X-DNS-Prefetch-Control', 'on');
-  if (!isLocal) {
-    res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+  for (const [name, value] of Object.entries(securityHeaders(isLocal))) {
+    res.setHeader(name, value);
   }
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  // The legacy XSS auditor is disabled on purpose; CSP above is the real control.
-  res.setHeader('X-XSS-Protection', '0');
-  res.setHeader('Referrer-Policy', 'origin-when-cross-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
 
 /**
- * The chat agent (LangGraph supervisor + sub-agents). Conversations live in memory and are
- * dropped together with their uploaded files when the thread expires.
+ * The chat agent (LangGraph supervisor + sub-agents). Threads live in Redis when it is
+ * configured (required on Vercel, whose function instances share no memory), otherwise in the
+ * memory of this process (local development, a single long-running server).
  */
-const conversations = new MemorySaver();
+const redis = redisFromEnv();
+const serverless = !!process.env['VERCEL'];
+const chatUnavailable = !isAgentConfigured()
+  ? 'Агент не налаштований: на сервері не задано ANTHROPIC_API_KEY.'
+  : serverless && !redis
+    ? 'Агент не налаштований: на Vercel потрібне сховище Upstash Redis (KV_REST_API_URL / KV_REST_API_TOKEN).'
+    : null;
 app.use(
   CHAT_API,
   chatRouter({
-    agent: isAgentConfigured() ? buildTaxeredAgent(anthropicModels(), conversations) : null,
-    forgetThread: (threadId) => conversations.deleteThread(threadId),
+    agent: chatUnavailable ? null : buildTaxeredAgent(anthropicModels()),
+    unavailable: chatUnavailable ?? undefined,
+    store: redis ? new RedisThreadStore(redis) : new MemoryThreadStore(),
+    maxRunMs: Number(process.env['TAXERED_MAX_RUN_SECONDS']) * 1000 || DEFAULT_MAX_RUN_MS,
   }),
 );
 
@@ -222,5 +241,5 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
  */
 export const reqHandler = createNodeRequestHandler(app);
 
-/** Used by scripts/write-sitemap.mjs after the build. */
-export { buildSitemap };
+/** Used by scripts/write-sitemap.mjs and scripts/vercel-output.mjs after the build. */
+export { buildSitemap, LEGACY_TOOL_PAGES, LOCALE };

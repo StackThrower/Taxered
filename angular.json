@@ -38,6 +38,7 @@
               "allowedHosts": [
                 "taxered.stackthrow.com",
                 "*.run.app",
+                "*.vercel.app",
                 "localhost",
                 "127.0.0.1"
               ]

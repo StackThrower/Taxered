@@ -42,7 +42,7 @@ const analyzeReturnsTool = tool(
   async (input, config) => {
     const session = sessionOf(config);
     const currency = input.currency ?? 'USD';
-    const files = pickFiles(session, input.fileIds, ['ib_csv']);
+    const files = await pickFiles(session, input.fileIds, ['ib_csv']);
     const warnings: string[] = [];
 
     const reports = files.flatMap((file) => {

@@ -2,6 +2,7 @@
   "$schema": "./node_modules/@angular/service-worker/config/schema.json",
   "index": "/index.csr.html",
   "navigationRequestStrategy": "freshness",
+  "navigationUrls": ["/**", "!/**/*.*", "!/**/*__*", "!/**/*__*/**", "!/api/**"],
   "assetGroups": [
     {
       "name": "app",

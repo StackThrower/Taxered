@@ -1,66 +1,25 @@
 /**
- * In-memory state of each chat thread: the files the user uploaded, the files the agent
- * generated, and the working data of the sub-agents (the Ф1 positions, the last analyses).
- * Nothing is written to disk; a thread is forgotten after `SESSION_TTL_MS` of inactivity.
+ * A chat thread as one request sees it: the uploaded files, the agent's working data (Ф1
+ * positions, the last returns analysis) and the conversation, loaded from a `ThreadStore` and
+ * saved back when the answer is done. Tools reach it through `config.configurable.session`.
  */
 import { randomUUID } from 'node:crypto';
-import type { FinancialPosition, TaxOptions } from '../app/declaration/f0121214/tax-model';
+import { gunzipSync, gzipSync } from 'node:zlib';
+import type { StoredMessage } from '@langchain/core/messages';
 import type { FileKind, UploadedFile } from '../app/chat/protocol';
 import { MAX_FILES_PER_THREAD } from '../app/chat/protocol';
-import type { LedgerAnalysis } from '../app/lib/ledger-csv';
-import type { Analysis, DisplayCurrency } from '../app/lib/returns-model';
-import { isLedgerCsv } from '../app/lib/ledger-csv';
 import { isIbCsvStatement } from '../app/lib/ib-csv-parser';
 import { detectXMLType } from '../app/lib/ib-xml-parser';
+import { isLedgerCsv } from '../app/lib/ledger-csv';
+import type { F1State, OutputMeta, ThreadState, ThreadStore } from './store/thread-store';
 
-export const SESSION_TTL_MS = 2 * 60 * 60 * 1000;
-const MAX_SESSIONS = 500;
-/** Uploads of one thread. */
+export type { F1State } from './store/thread-store';
+
+/** Uploads of one thread, uncompressed. */
 const MAX_THREAD_BYTES = 40 * 1024 * 1024;
-/** Uploads and generated files of all threads; the least recently used threads make room. */
-const MAX_TOTAL_BYTES = 400 * 1024 * 1024;
 
 export interface StoredFile extends UploadedFile {
   content: string;
-}
-
-export interface StoredOutput {
-  id: string;
-  name: string;
-  mime: string;
-  bytes: Uint8Array;
-}
-
-export interface F1State {
-  year: string;
-  positions: FinancialPosition[];
-  options: TaxOptions;
-}
-
-export interface Session {
-  id: string;
-  files: Map<string, StoredFile>;
-  outputs: Map<string, StoredOutput>;
-  f1: F1State | null;
-  returns: { currency: DisplayCurrency; analysis: Analysis } | null;
-  ledger: { fileName: string; analysis: LedgerAnalysis } | null;
-  touchedAt: number;
-}
-
-const sessions = new Map<string, Session>();
-const evictionListeners = new Set<(id: string) => void>();
-
-/** Called when a thread expires or is pushed out, so its conversation can be dropped too. */
-export function onSessionEvicted(listener: (id: string) => void): () => void {
-  evictionListeners.add(listener);
-  return () => evictionListeners.delete(listener);
-}
-
-function evict(id: string): void {
-  sessions.delete(id);
-  for (const listener of evictionListeners) {
-    listener(id);
-  }
 }
 
 /** Thread ids are random UUIDs made by the browser; they are the only key to a thread. */
@@ -71,102 +30,82 @@ export function isThreadId(value: unknown): value is string {
   );
 }
 
-export function getSession(id: string, now = Date.now()): Session {
-  evictExpired(now);
-  let session = sessions.get(id);
-  if (!session) {
-    if (sessions.size >= MAX_SESSIONS) {
-      const oldest = [...sessions.values()].sort((a, b) => a.touchedAt - b.touchedAt)[0];
-      evict(oldest.id);
+export class Session {
+  f1: F1State | null;
+  returns: ThreadState['returns'];
+  messages: StoredMessage[];
+  private readonly contents = new Map<string, string>();
+
+  private constructor(
+    readonly id: string,
+    readonly store: ThreadStore,
+    readonly files: Map<string, UploadedFile>,
+    state: ThreadState | null,
+  ) {
+    this.f1 = state?.f1 ?? null;
+    this.returns = state?.returns ?? null;
+    this.messages = state?.messages ?? [];
+  }
+
+  static async open(store: ThreadStore, id: string): Promise<Session> {
+    const [state, files] = await Promise.all([store.getState(id), store.listFiles(id)]);
+    return new Session(id, store, new Map(files.map((f) => [f.id, f])), state);
+  }
+
+  /** The text of an uploaded file. */
+  async read(file: UploadedFile): Promise<StoredFile> {
+    let content = this.contents.get(file.id);
+    if (content === undefined) {
+      const bytes = await this.store.getFile(this.id, file.id);
+      if (!bytes) {
+        throw new Error(`Файл «${file.name}» більше недоступний — завантажте його ще раз.`);
+      }
+      content = gunzipSync(bytes).toString('utf8');
+      this.contents.set(file.id, content);
     }
-    session = {
-      id,
-      files: new Map(),
-      outputs: new Map(),
-      f1: null,
-      returns: null,
-      ledger: null,
-      touchedAt: now,
-    };
-    sessions.set(id, session);
+    return { ...file, content };
   }
-  session.touchedAt = now;
-  return session;
-}
 
-export function deleteSession(id: string): void {
-  sessions.delete(id);
-}
+  async addOutput(name: string, mime: string, bytes: Uint8Array): Promise<OutputMeta> {
+    const output: OutputMeta = { id: randomUUID(), name, mime, size: bytes.byteLength };
+    await this.store.putOutput(this.id, output, bytes);
+    return output;
+  }
 
-function evictExpired(now: number): void {
-  for (const [id, session] of sessions) {
-    if (now - session.touchedAt > SESSION_TTL_MS) {
-      evict(id);
-    }
+  async save(): Promise<void> {
+    await this.store.setState(this.id, {
+      messages: this.messages,
+      f1: this.f1,
+      returns: this.returns,
+    });
   }
 }
 
-function sessionBytes(session: Session): number {
-  let total = 0;
-  for (const f of session.files.values()) {
-    total += f.size;
-  }
-  for (const o of session.outputs.values()) {
-    total += o.bytes.byteLength;
-  }
-  return total;
-}
-
-/** Evicts the least recently used other threads until `bytes` more fit under the total. */
-function makeRoom(current: Session, bytes: number): void {
-  let total = [...sessions.values()].reduce((sum, s) => sum + sessionBytes(s), 0);
-  const others = [...sessions.values()]
-    .filter((s) => s !== current)
-    .sort((a, b) => a.touchedAt - b.touchedAt);
-  for (const session of others) {
-    if (total + bytes <= MAX_TOTAL_BYTES) {
-      return;
-    }
-    total -= sessionBytes(session);
-    evict(session.id);
-  }
-  if (total + bytes > MAX_TOTAL_BYTES) {
-    throw new Error('Сервер перевантажений файлами. Спробуйте пізніше.');
-  }
-}
-
-export function addFile(session: Session, name: string, content: string): StoredFile {
-  if (session.files.size >= MAX_FILES_PER_THREAD) {
+/** Stores an uploaded file (already decoded to text) and recognises its format. */
+export async function uploadFile(
+  store: ThreadStore,
+  threadId: string,
+  name: string,
+  content: string,
+): Promise<UploadedFile> {
+  const files = await store.listFiles(threadId);
+  if (files.length >= MAX_FILES_PER_THREAD) {
     throw new Error(`У розмові може бути не більше ${MAX_FILES_PER_THREAD} файлів.`);
   }
-  const used = [...session.files.values()].reduce((sum, f) => sum + f.size, 0);
-  if (used + Buffer.byteLength(content) > MAX_THREAD_BYTES) {
+  const size = Buffer.byteLength(content);
+  if (files.reduce((sum, f) => sum + f.size, 0) + size > MAX_THREAD_BYTES) {
     throw new Error(
       `Файли розмови разом не можуть перевищувати ${MAX_THREAD_BYTES / 1024 / 1024} МБ. Почніть нову розмову.`,
     );
   }
-  makeRoom(session, Buffer.byteLength(content));
-  const file: StoredFile = {
+  const file: UploadedFile = {
     id: `f_${randomUUID().slice(0, 8)}`,
     name,
-    size: Buffer.byteLength(content),
+    size,
     kind: detectFileKind(content),
-    content,
   };
-  session.files.set(file.id, file);
+  await store.putFile(threadId, file, new Uint8Array(gzipSync(content)));
   return file;
-}
-
-export function addOutput(
-  session: Session,
-  name: string,
-  mime: string,
-  bytes: Uint8Array,
-): StoredOutput {
-  makeRoom(session, bytes.byteLength);
-  const output: StoredOutput = { id: randomUUID(), name, mime, bytes };
-  session.outputs.set(output.id, output);
-  return output;
 }
 
 export function detectFileKind(content: string): FileKind {

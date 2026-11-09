@@ -1,4 +1,3 @@
-import { MemorySaver } from '@langchain/langgraph';
 import { HumanMessage, type BaseMessage } from '@langchain/core/messages';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
@@ -8,7 +7,8 @@ import type { ChatStreamEvent, FileArtifact, UploadedFile } from '../app/chat/pr
 import { LEDGER_CSV } from './testing/fixtures';
 import { buildTaxeredAgent } from './graph';
 import { chatRouter, decodeText } from './http';
-import { deleteSession } from './session';
+import { MemoryThreadStore } from './store/thread-store';
+import { gzipSync } from 'node:zlib';
 import { callTool, reply, scriptedModels, type ScriptStep } from './testing/scripted-model';
 
 /** The id of the first file mentioned in the last user message. */
@@ -33,36 +33,40 @@ async function readEvents(response: Response): Promise<ChatStreamEvent[]> {
 }
 
 describe('chat API with the LangGraph agent', () => {
-  let server: Server | undefined;
+  const servers: Server[] = [];
   const threadId = randomUUID();
 
   afterEach(() => {
-    server?.close();
-    server = undefined;
-    deleteSession(threadId);
+    servers.splice(0).forEach((s) => s.close());
   });
+
+  /**
+   * A server with its own agent and router over `store`; two of them over one store behave
+   * like two serverless function instances.
+   */
+  async function serverOver(
+    store: MemoryThreadStore,
+    models: ReturnType<typeof scriptedModels>['models'] | null,
+  ): Promise<string> {
+    const app = express();
+    app.use('/api/chat', chatRouter({ agent: models ? buildTaxeredAgent(models) : null, store }));
+    const running = await serve(app);
+    servers.push(running.server);
+    return running.base;
+  }
 
   async function start(scripts: Parameters<typeof scriptedModels>[0]) {
     const { models, instances } = scriptedModels(scripts);
-    const memory = new MemorySaver();
-    const app = express();
-    app.use(
-      '/api/chat',
-      chatRouter({
-        agent: buildTaxeredAgent(models, memory),
-        forgetThread: (id) => memory.deleteThread(id),
-      }),
-    );
-    const running = await serve(app);
-    server = running.server;
-    return { base: running.base, instances };
+    const store = new MemoryThreadStore();
+    return { base: await serverOver(store, models), instances, store, models };
   }
 
+  /** Uploads gzip-compressed, as the browser does to stay under Vercel's request limit. */
   async function upload(base: string, name: string, content: string): Promise<UploadedFile> {
     const response = await fetch(`${base}/threads/${threadId}/files`, {
       method: 'POST',
-      headers: { 'X-File-Name': encodeURIComponent(name) },
-      body: content,
+      headers: { 'X-File-Name': encodeURIComponent(name), 'Content-Encoding': 'gzip' },
+      body: gzipSync(content),
     });
     expect(response.status).toBe(201);
     return (await response.json()) as UploadedFile;
@@ -90,7 +94,7 @@ describe('chat API with the LangGraph agent', () => {
       callTool('export_spreads_report', {}),
       reply('Спред 47 USD на 1 обміні; звіт сформовано.'),
     ];
-    const { base, instances } = await start({ supervisor, spreads });
+    const { base, instances, store, models } = await start({ supervisor, spreads });
 
     const file = await upload(base, 'ledger.csv', LEDGER_CSV);
     expect(file).toMatchObject({ name: 'ledger.csv', kind: 'ledger_csv' });
@@ -125,8 +129,9 @@ describe('chat API with the LangGraph agent', () => {
       new Uint8Array([0x50, 0x4b]),
     );
 
-    // The next message continues the same thread.
-    const second = await readEvents(await send(base, 'Дякую'));
+    // The next message reaches another instance and continues the same thread from the store.
+    const other = await serverOver(store, models);
+    const second = await readEvents(await send(other, 'Дякую'));
     expect(second.at(-1)).toEqual({ type: 'done' });
     const history = instances.get('supervisor')!.calls[2];
     expect(history.map((m) => m.getType())).toEqual([
@@ -155,10 +160,8 @@ describe('chat API with the LangGraph agent', () => {
   });
 
   it('rejects bad requests and reports a missing API key', async () => {
-    const app = express();
-    app.use('/api/chat', chatRouter({ agent: null }));
-    const running = await serve(app);
-    server = running.server;
+    const base = await serverOver(new MemoryThreadStore(), null);
+    const running = { base };
 
     expect(
       (await fetch(`${running.base}/threads/not-a-uuid/messages`, { method: 'POST' })).status,

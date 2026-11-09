@@ -1,30 +1,23 @@
 /**
- * Helpers the tools of every sub-agent share. The thread id travels in
- * `config.configurable.thread_id`; artifacts leave a tool as LangChain custom events, which
- * the HTTP handler forwards to the browser (they bubble up from the nested sub-agent runs).
+ * Helpers the tools of every sub-agent share. The thread's `Session` travels in
+ * `config.configurable.session`; artifacts leave a tool as LangChain custom events, which the
+ * HTTP handler forwards to the browser (they bubble up from the nested sub-agent runs).
  */
 import { dispatchCustomEvent } from '@langchain/core/callbacks/dispatch';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import { randomUUID } from 'node:crypto';
 import type { ChatArtifact, FileArtifact, FileKind } from '../app/chat/protocol';
 import { CHAT_API } from '../app/chat/protocol';
-import {
-  FILE_KIND_LABELS,
-  addOutput,
-  getSession,
-  isThreadId,
-  type Session,
-  type StoredFile,
-} from './session';
+import { FILE_KIND_LABELS, Session, type StoredFile } from './session';
 
 export const ARTIFACT_EVENT = 'taxered_artifact';
 
 export function sessionOf(config: RunnableConfig | undefined): Session {
-  const id: unknown = config?.configurable?.['thread_id'];
-  if (!isThreadId(id)) {
-    throw new Error('Немає ідентифікатора розмови.');
+  const session: unknown = config?.configurable?.['session'];
+  if (!(session instanceof Session)) {
+    throw new Error('Немає розмови.');
   }
-  return getSession(id);
+  return session;
 }
 
 export function artifactId(): string {
@@ -47,14 +40,15 @@ export async function emitFile(
   description: string,
 ): Promise<FileArtifact> {
   const session = sessionOf(config);
-  const output = addOutput(session, name, mime, bytes);
+  const output = await session.addOutput(name, mime, bytes);
   const artifact: FileArtifact = {
     kind: 'file',
     id: output.id,
     name,
     mime,
     size: bytes.byteLength,
-    url: `${CHAT_API}/threads/${session.id}/outputs/${output.id}`,
+    // `ngsw-bypass`: the service worker must not answer the download with the app shell.
+    url: `${CHAT_API}/threads/${session.id}/outputs/${output.id}?ngsw-bypass=true`,
     description,
   };
   await emitArtifact(artifact, config);
@@ -65,12 +59,21 @@ export async function emitFile(
  * The files a tool works on: the ones named by id, or every uploaded file of the given kinds.
  * Throws a message the model can relay when there is none or an id has the wrong kind.
  */
-export function pickFiles(
+export async function pickFiles(
   session: Session,
   ids: readonly string[] | undefined,
   kinds: readonly FileKind[],
-): StoredFile[] {
+): Promise<StoredFile[]> {
   const wanted = kinds.map((k) => FILE_KIND_LABELS[k]).join(' або ');
+  return Promise.all(chooseFiles(session, ids, kinds, wanted).map((f) => session.read(f)));
+}
+
+function chooseFiles(
+  session: Session,
+  ids: readonly string[] | undefined,
+  kinds: readonly FileKind[],
+  wanted: string,
+) {
   if (ids && ids.length > 0) {
     return ids.map((id) => {
       const file = session.files.get(id);

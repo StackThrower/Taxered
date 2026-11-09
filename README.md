@@ -26,11 +26,13 @@
   сервер пересилає їх у браузер разом зі стрімом тексту (SSE). Артефакт містить вхідні дані
   розрахунку, а браузер виконує ті самі чисті функції — тож форма в чаті завжди збігається з
   цифрами агента. Ф1 можна відкрити в редагованій формі та експортувати прямо з браузера.
-- **Пам'ять.** Розмову supervisor-а зберігає чекпоінтер LangGraph (`MemorySaver`) за
-  `thread_id`; субагенти без стану — кожне делегування є окремою задачею. Історія лише
+- **Пам'ять.** Розмову supervisor-а (повідомлення LangChain), файли й результати зберігає
+  `ThreadStore` (`src/agent/store`): Redis (Upstash) на Vercel або пам'ять процесу локально.
+  Кожен запит завантажує розмову, проганяє граф і зберігає її назад, тож агент працює і в
+  serverless. Субагенти без стану — кожне делегування є окремою задачею. Історія лише
   доповнюється (вимога preserved thinking у Claude Opus 5.5).
-- **Дані.** Файли й результати живуть лише в пам'яті сервера (до 2 годин неактивності або до
-  «Нова розмова»), на диск не пишуться. Моделі передаються повідомлення та підсумки розрахунків,
+- **Дані.** Файли й результати зберігаються до 2 годин неактивності або до «Нова розмова»
+  (у Redis з TTL або в пам'яті процесу). Моделі передаються повідомлення та підсумки розрахунків,
   а не файли цілком.
 
 ### API чату
@@ -112,11 +114,39 @@ schemas/dps/       # офіційні XSD і бланки ДПС
 
 ## Деплой
 
+### Vercel
+
+`vercel.json` запускає `npm run build:vercel`: звичайна збірка, після неї
+`scripts/vercel-output.mjs` складає `.vercel/output` (Build Output API v3):
+
+- `static/` — пререндерені сторінки та асети, їх віддає CDN;
+- `functions/ssr.func/` — самодостатній SSR-сервер (Express + агент) як одна Node.js-функція
+  зі стрімінгом відповіді (`maxDuration` 300 с);
+- `config.json` — редиректи зі старих сторінок, заголовки безпеки (ті самі, що в `server.ts`),
+  кешування, маршрутизація `/api/*` і решти запитів у функцію.
+
+Функції Vercel не мають спільної пам'яті, тому розмови, файли й результати зберігаються в
+**Redis (Upstash)**. Налаштування проєкту на Vercel:
+
+1. **Storage → Marketplace → Upstash for Redis** — створити базу й під'єднати до проєкту
+   (додає `KV_REST_API_URL` і `KV_REST_API_TOKEN`; підходять і `UPSTASH_REDIS_REST_URL` /
+   `UPSTASH_REDIS_REST_TOKEN`).
+2. **Settings → Environment Variables** — `ANTHROPIC_API_KEY` (тип Sensitive); за потреби
+   `TAXERED_MODEL`, `TAXERED_EFFORT`.
+3. **Settings → Functions** — Fluid compute увімкнено (потрібно для 300 с на відповідь).
+4. Передеплоїти. Без Redis або ключа чат відповідає, чого саме бракує.
+
+Обмеження Vercel, які враховано: тіло запиту до функції ≤ 4,5 МБ — браузер стискає файли gzip
+перед завантаженням; відповідь агента обмежена `TAXERED_MAX_RUN_SECONDS` (280 с), щоб
+завершитися до зупинки функції; service worker не перехоплює `/api/*`.
+
+### Docker / Cloud Run
+
 `Dockerfile` збирає застосунок і запускає самодостатній SSR-бандл (`node dist/Taxered/server/server.mjs`,
 порт 3000). GitHub Actions (`.github/workflows/deploy.yml`) публікує образ у GHCR при пуші в `master`;
 `terraform/` описує сервіс Cloud Run: ключ Anthropic береться з Secret Manager
-(`anthropic_api_key_secret`), а `session_affinity` тримає браузер на інстансі, у пам'яті якого
-його розмова (стан чату не спільний між інстансами).
+(`anthropic_api_key_secret`). Без Redis розмови живуть у пам'яті процесу, і `session_affinity`
+тримає браузер на його інстансі; із `KV_REST_API_URL` / `KV_REST_API_TOKEN` стан спільний.
 
 Дозволені хости для SSR задаються в `angular.json` → `security.allowedHosts`
-(`taxered.stackthrow.com`, `*.run.app`, `localhost`).
+(`taxered.stackthrow.com`, `*.run.app`, `*.vercel.app`, `localhost`).
