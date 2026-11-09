@@ -410,7 +410,10 @@ export const UK = {
     invested: 'Чисті внески',
     investedHint: 'надходження мінус виведення',
     result: 'Результат',
-    pricesFrom: 'Ціни CoinGecko на {time}',
+    pricesFrom: 'Ціни CoinGecko на {time}, оновлюються щохвилини.',
+    pricesLive: 'Наживо з Binance: {tickers}.',
+    live: 'ціна наживо',
+    liveHint: 'Ціна з Binance, оновлюється щосекунди',
     pricesLoading: 'Завантажуємо поточні ціни…',
     pricesFailed:
       'Не вдалося отримати ціни з CoinGecko — показано ціни Ledger на момент експорту файлу.',

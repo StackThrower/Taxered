@@ -1,7 +1,20 @@
-import { ChangeDetectionStrategy, Component, computed, input, resource } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  PLATFORM_ID,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { AlertCircle, RefreshCw } from 'lucide';
 import { UK } from '../../core/i18n';
-import { fetchMarketPrices } from '../../lib/crypto-prices';
+import { supportsLivePrices, watchLivePrices } from '../../lib/binance-ticker';
+import { MarketPrice, fetchMarketPrices } from '../../lib/crypto-prices';
 import type { LedgerAnalysis, LedgerOperation } from '../../lib/ledger-csv';
 import {
   currentHoldings,
@@ -13,6 +26,8 @@ import { Icon } from '../../shared/icon';
 import { ChartSeries } from '../calculator/chart-utils';
 import { LineChart } from '../calculator/line-chart';
 import { LedgerFormatters } from './format';
+
+const MARKET_REFRESH_MS = 60_000;
 
 /** Current holdings at market prices and the portfolio value after each transaction. */
 @Component({
@@ -41,22 +56,26 @@ import { LedgerFormatters } from './format';
           <button
             type="button"
             class="btn btn-outline btn-sm"
-            [disabled]="market.isLoading()"
-            (click)="market.reload()"
+            [disabled]="marketLoading()"
+            (click)="refreshMarket()"
           >
             <svg [appIcon]="icons.RefreshCw" class="size-4"></svg>
             {{ s.refresh }}
           </button>
         </div>
-        <p class="text-sm text-muted-foreground" aria-live="polite">
-          @if (market.isLoading()) {
+        <p class="text-sm text-muted-foreground">
+          @if (liveTickers().length > 0) {
+            {{ s.pricesLive.replace('{tickers}', liveTickers().join(', ')) }}
+          }
+          @if (market(); as m) {
+            {{ s.pricesFrom.replace('{time}', f.time(m.time)) }}
+          } @else if (marketLoading()) {
             {{ s.pricesLoading }}
-          } @else if (market.error()) {
-            <span class="text-destructive">{{ s.pricesFailed }}</span>
-          } @else if (market.hasValue()) {
-            {{ s.pricesFrom.replace('{time}', f.time(market.value().time)) }}
           }
         </p>
+        @if (marketFailed()) {
+          <p class="text-sm text-destructive" role="alert">{{ s.pricesFailed }}</p>
+        }
       </div>
       <div class="card-content space-y-6">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -111,7 +130,13 @@ import { LedgerFormatters } from './format';
                   <tr class="border-b last:border-0">
                     <th scope="row" class="py-2 pr-4 text-left font-medium whitespace-nowrap">
                       {{ h.ticker }}
-                      @if (h.source === 'export') {
+                      @if (h.source === 'live') {
+                        <span
+                          class="ml-1 inline-block size-2 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+                          [title]="s.liveHint"
+                        ></span>
+                        <span class="sr-only">({{ s.live }})</span>
+                      } @else if (h.source === 'export') {
                         <span class="badge ml-1 font-normal" [title]="s.priceFromFileHint">
                           {{ s.priceFromFile }}
                         </span>
@@ -170,22 +195,88 @@ export class LedgerPortfolio {
   protected readonly s = UK.ledger;
   protected readonly icons = { AlertCircle, RefreshCw };
 
-  /** Market prices of the assets still held; `time` is when they were fetched. */
-  protected readonly market = resource({
-    params: () => ({ tickers: heldTickers(this.operations()), fiat: this.analysis().fiat }),
-    loader: async ({ params }) => ({
-      prices: await fetchMarketPrices(params.tickers, params.fiat || 'USD'),
-      time: Date.now(),
-    }),
-  });
+  private readonly tickers = computed(() => heldTickers(this.operations()));
+  private readonly fiat = computed(() => this.analysis().fiat || 'USD');
+
+  /** CoinGecko prices of the assets still held; `time` is when they were fetched. */
+  protected readonly market = signal<{
+    prices: ReadonlyMap<string, MarketPrice>;
+    time: number;
+  } | null>(null);
+  protected readonly marketLoading = signal(false);
+  protected readonly marketFailed = signal(false);
+  /** Prices streamed from Binance; they take precedence over CoinGecko's. */
+  private readonly live = signal<ReadonlyMap<string, MarketPrice>>(new Map());
+  /** Drops responses to requests made for an earlier file. */
+  private marketRequest = 0;
+
+  protected readonly liveTickers = computed(() =>
+    this.holdings()
+      .filter((h) => h.source === 'live')
+      .map((h) => h.ticker),
+  );
+
+  constructor() {
+    if (!isPlatformBrowser(inject(PLATFORM_ID))) {
+      return;
+    }
+
+    effect(() => {
+      this.tickers();
+      this.fiat();
+      untracked(() => {
+        this.market.set(null);
+        void this.refreshMarket();
+      });
+    });
+
+    effect((onCleanup) => {
+      const tickers = this.tickers();
+      const fiat = this.fiat();
+      this.live.set(new Map());
+      if (supportsLivePrices(fiat)) {
+        const stop = watchLivePrices(tickers, (prices) =>
+          this.live.update((all) => new Map([...all, ...prices])),
+        );
+        onCleanup(stop);
+      }
+    });
+
+    // CoinGecko refreshes its prices about once a minute; polling faster gains nothing and
+    // runs into its rate limit. A hidden tab is not polled.
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void this.refreshMarket();
+      }
+    }, MARKET_REFRESH_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  /** Fetches CoinGecko prices; on failure the last ones fetched are kept. */
+  protected async refreshMarket(): Promise<void> {
+    const request = ++this.marketRequest;
+    this.marketLoading.set(true);
+    try {
+      const prices = await fetchMarketPrices(this.tickers(), this.fiat());
+      if (request === this.marketRequest) {
+        this.market.set({ prices, time: Date.now() });
+        this.marketFailed.set(false);
+      }
+    } catch {
+      if (request === this.marketRequest) {
+        this.marketFailed.set(true);
+      }
+    } finally {
+      if (request === this.marketRequest) {
+        this.marketLoading.set(false);
+      }
+    }
+  }
 
   protected readonly negative = computed(() => negativeBalances(this.operations()));
 
   protected readonly holdings = computed(() =>
-    currentHoldings(
-      this.operations(),
-      this.market.hasValue() ? this.market.value().prices : new Map(),
-    ),
+    currentHoldings(this.operations(), this.market()?.prices ?? new Map(), this.live()),
   );
 
   private readonly history = computed(() =>

@@ -21,8 +21,8 @@ export interface Holding {
   price: number | null;
   value: number;
   change24h: number | null;
-  /** `market`: CoinGecko now; `export`: Ledger's price when the file was exported. */
-  source: 'market' | 'export' | null;
+  /** `live`: streamed now; `market`: polled now; `export`: Ledger's price at export time. */
+  source: 'live' | 'market' | 'export' | null;
 }
 
 export interface PortfolioPoint {
@@ -100,12 +100,13 @@ export function portfolioHistory(
 }
 
 /**
- * Current balances valued at market prices, falling back to the price Ledger had when the
- * file was exported. The largest holding first; dust is left out.
+ * Current balances valued at live prices, then polled market prices, then the price Ledger
+ * had when the file was exported. The largest holding first; dust is left out.
  */
 export function currentHoldings(
   ops: readonly LedgerOperation[],
   market: ReadonlyMap<string, MarketPrice>,
+  live: ReadonlyMap<string, MarketPrice> = new Map(),
 ): Holding[] {
   const exported = exportPrices(ops);
   const holdings: Holding[] = [];
@@ -113,7 +114,8 @@ export function currentHoldings(
     if (amount <= DUST_AMOUNT) {
       continue;
     }
-    const quote = market.get(ticker.toUpperCase());
+    const liveQuote = live.get(ticker.toUpperCase());
+    const quote = liveQuote ?? market.get(ticker.toUpperCase());
     const fallback = exported.get(ticker);
     const price = quote?.price ?? fallback ?? null;
     const holding: Holding = {
@@ -122,7 +124,7 @@ export function currentHoldings(
       price,
       value: price === null ? 0 : amount * price,
       change24h: quote?.change24h ?? null,
-      source: quote ? 'market' : fallback !== undefined ? 'export' : null,
+      source: liveQuote ? 'live' : quote ? 'market' : fallback !== undefined ? 'export' : null,
     };
     if (holding.value >= DUST_VALUE || price === null) {
       holdings.push(holding);

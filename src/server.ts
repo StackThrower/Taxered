@@ -40,9 +40,9 @@ function contentSecurityPolicy(isLocal: boolean): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.clarity.ms https://c.bing.com",
     "font-src 'self' data:",
-    // Analytics beacons, the NBU exchange-rate API and CoinGecko crypto prices (Ledger page).
-    // Everything else is denied.
-    "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com https://bank.gov.ua https://api.coingecko.com",
+    // Analytics beacons, the NBU exchange-rate API, and CoinGecko and Binance crypto prices
+    // (Ledger page). Everything else is denied.
+    "connect-src 'self' https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.clarity.ms https://c.bing.com https://bank.gov.ua https://api.coingecko.com wss://stream.binance.com",
     // blob: is required by the service worker and by the generated PDFs,
     // which are opened via window.open(doc.output('bloburl')).
     "worker-src 'self' blob:",
