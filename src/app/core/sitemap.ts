@@ -18,6 +18,7 @@ export function buildSitemap(lastmod: string): string {
     { path: localePath(), lastmod, changefreq: 'weekly', priority: 0.9 },
     { path: localePath('calculator'), lastmod, changefreq: 'monthly', priority: 0.8 },
     { path: localePath('tax-map'), lastmod, changefreq: 'monthly', priority: 0.8 },
+    { path: localePath('ledger'), lastmod, changefreq: 'monthly', priority: 0.7 },
     { path: localePath('about'), lastmod, changefreq: 'monthly', priority: 0.6 },
     { path: localePath('help'), lastmod, changefreq: 'weekly', priority: 0.7 },
     { path: localePath('knowledge'), lastmod, changefreq: 'daily', priority: 0.8 },

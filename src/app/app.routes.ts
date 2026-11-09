@@ -19,6 +19,10 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tax-map/tax-map-page').then((m) => m.TaxMapPage),
       },
       {
+        path: 'ledger',
+        loadComponent: () => import('./pages/ledger/ledger-page').then((m) => m.LedgerPage),
+      },
+      {
         path: 'about',
         loadComponent: () => import('./pages/about/about-page').then((m) => m.AboutPage),
       },
