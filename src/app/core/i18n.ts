@@ -8,7 +8,6 @@ export const UK = {
     subtitle: 'Податкові декларації',
     forms: 'Форми',
     calculator: 'Калькулятор',
-    ledger: 'Ledger',
     help: 'Допомога',
     openMenu: 'Відкрити меню',
     closeMenu: 'Закрити меню',

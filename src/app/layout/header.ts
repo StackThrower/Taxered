@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Calculator, FileText, HelpCircle, Menu, Wallet, X } from 'lucide';
+import { Calculator, FileText, HelpCircle, Menu, X } from 'lucide';
 import { UK } from '../core/i18n';
 import { localePath } from '../core/site';
 import { Icon } from '../shared/icon';
@@ -16,9 +16,8 @@ export class Header {
   protected readonly s = UK.header;
   protected readonly homePath = localePath();
   protected readonly calculatorPath = localePath('calculator');
-  protected readonly ledgerPath = localePath('ledger');
   protected readonly helpPath = localePath('help');
-  protected readonly icons = { Calculator, FileText, HelpCircle, Menu, Wallet, X };
+  protected readonly icons = { Calculator, FileText, HelpCircle, Menu, X };
 
   private readonly menu = viewChild.required<ElementRef<HTMLDialogElement>>('menu');
 
