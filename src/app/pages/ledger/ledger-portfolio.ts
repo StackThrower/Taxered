@@ -17,6 +17,7 @@ import { supportsLivePrices, watchLivePrices } from '../../lib/binance-ticker';
 import { MarketPrice, fetchMarketPrices } from '../../lib/crypto-prices';
 import type { LedgerAnalysis, LedgerOperation } from '../../lib/ledger-csv';
 import {
+  Holding,
   currentHoldings,
   heldTickers,
   negativeBalances,
@@ -28,6 +29,10 @@ import { LineChart } from '../calculator/line-chart';
 import { LedgerFormatters } from './format';
 
 const MARKET_REFRESH_MS = 60_000;
+/** How long a price stays green or red after it changes. */
+const MOVE_HIGHLIGHT_MS = 1500;
+
+type PriceMove = 'up' | 'down';
 
 /** Current holdings at market prices and the portfolio value after each transaction. */
 @Component({
@@ -143,8 +148,16 @@ const MARKET_REFRESH_MS = 60_000;
                       }
                     </th>
                     <td class="py-2 pr-4 text-right">{{ f.amount(h.amount) }}</td>
-                    <td class="py-2 pr-4 text-right whitespace-nowrap">
+                    @let move = priceMoves().get(h.ticker);
+                    <td
+                      class="py-2 pr-4 text-right whitespace-nowrap transition-colors"
+                      [class.text-primary]="move === 'up'"
+                      [class.text-destructive]="move === 'down'"
+                    >
                       {{ h.price === null ? s.noPrice : f.money(h.price) }}
+                      <span class="inline-block w-3 text-center text-xs" aria-hidden="true">{{
+                        move === 'up' ? '▲' : move === 'down' ? '▼' : ''
+                      }}</span>
                     </td>
                     <td
                       class="py-2 pr-4 text-right whitespace-nowrap"
@@ -210,6 +223,12 @@ export class LedgerPortfolio {
   /** Drops responses to requests made for an earlier file. */
   private marketRequest = 0;
 
+  /** Tickers whose price just went up or down; they are shown green or red for a moment. */
+  protected readonly priceMoves = signal<ReadonlyMap<string, PriceMove>>(new Map());
+  /** Last price and its source per ticker; a change of source is not a move. */
+  private readonly lastPrices = new Map<string, { price: number; source: Holding['source'] }>();
+  private readonly moveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
   protected readonly liveTickers = computed(() =>
     this.holdings()
       .filter((h) => h.source === 'live')
@@ -249,7 +268,44 @@ export class LedgerPortfolio {
         void this.refreshMarket();
       }
     }, MARKET_REFRESH_MS);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    effect(() => {
+      const holdings = this.holdings();
+      untracked(() => this.trackMoves(holdings));
+    });
+
+    inject(DestroyRef).onDestroy(() => {
+      clearInterval(timer);
+      this.moveTimers.forEach((t) => clearTimeout(t));
+    });
+  }
+
+  /** Marks tickers whose market price changed since the last update. */
+  private trackMoves(holdings: readonly Holding[]): void {
+    for (const { ticker, price, source } of holdings) {
+      if (price === null || (source !== 'live' && source !== 'market')) {
+        continue;
+      }
+      const last = this.lastPrices.get(ticker);
+      this.lastPrices.set(ticker, { price, source });
+      if (!last || last.source !== source || last.price === price) {
+        continue;
+      }
+      this.priceMoves.update((moves) =>
+        new Map(moves).set(ticker, price > last.price ? 'up' : 'down'),
+      );
+      clearTimeout(this.moveTimers.get(ticker));
+      this.moveTimers.set(
+        ticker,
+        setTimeout(() => {
+          this.moveTimers.delete(ticker);
+          this.priceMoves.update((moves) => {
+            const next = new Map(moves);
+            next.delete(ticker);
+            return next;
+          });
+        }, MOVE_HIGHLIGHT_MS),
+      );
+    }
   }
 
   /** Fetches CoinGecko prices; on failure the last ones fetched are kept. */
