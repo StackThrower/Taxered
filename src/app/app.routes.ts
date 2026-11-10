@@ -1,5 +1,5 @@
 import { ActivatedRouteSnapshot, Routes } from '@angular/router';
-import { LOCALE } from './core/site';
+import { HOME_PATH, LOCALE } from './core/site';
 
 const chatPage = () => import('./chat/chat-page').then((m) => m.ChatPage);
 
@@ -11,14 +11,15 @@ export const LEGACY_TOOL_PAGES: Readonly<Record<string, string>> = {
 };
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', loadComponent: chatPage, data: { root: true } },
+  { path: '', pathMatch: 'full', loadComponent: chatPage },
   {
     path: LOCALE,
     children: [
-      { path: '', pathMatch: 'full', loadComponent: chatPage },
+      // The home page lives only at the site root; query params (e.g. `?topic=`) are kept.
+      { path: '', pathMatch: 'full', redirectTo: HOME_PATH },
       ...Object.entries(LEGACY_TOOL_PAGES).map(([path, topic]) => ({
         path,
-        redirectTo: `/${LOCALE}?topic=${topic}`,
+        redirectTo: `${HOME_PATH}?topic=${topic}`,
       })),
       {
         path: 'about',

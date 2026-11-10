@@ -17,7 +17,7 @@ const fn = new URL('functions/ssr.func/', out);
 /** Vercel stops the function after this many seconds (Hobby and Pro allow 300). */
 const MAX_DURATION = 300;
 
-const { securityHeaders, LEGACY_TOOL_PAGES, LOCALE } = await import(
+const { securityHeaders, LEGACY_TOOL_PAGES, LOCALE, HOME_PATH } = await import(
   new URL('server/server.mjs', dist).href
 );
 
@@ -61,11 +61,20 @@ const NO_CACHE = [
 ];
 
 const routes = [
+  // The former locale home page: the home page lives at the site root only. Links to a chat
+  // topic (`/uk-ua?topic=returns`) keep it.
+  {
+    src: `^/${LOCALE}/?$`,
+    has: [{ type: 'query', key: 'topic', value: '(?<topic>[a-z-]+)' }],
+    status: 301,
+    headers: { Location: `${HOME_PATH}?topic=$topic` },
+  },
+  { src: `^/${LOCALE}/?$`, status: 301, headers: { Location: HOME_PATH } },
   // The calculator, tax map and Ledger pages became tasks of the chat assistant.
   ...Object.entries(LEGACY_TOOL_PAGES).map(([path, topic]) => ({
     src: `^/${LOCALE}/${path}/?$`,
     status: 301,
-    headers: { Location: `/${LOCALE}?topic=${topic}` },
+    headers: { Location: `${HOME_PATH}?topic=${topic}` },
   })),
   { src: '^/.*$', headers: securityHeaders(false), continue: true },
   {

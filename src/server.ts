@@ -13,7 +13,7 @@ import { RedisThreadStore, redisFromEnv } from './agent/store/redis-store';
 import { MemoryThreadStore } from './agent/store/thread-store';
 import { CHAT_API } from './app/chat/protocol';
 import { LEGACY_TOOL_PAGES } from './app/app.routes';
-import { LOCALE, SITE_URL } from './app/core/site';
+import { HOME_PATH, LOCALE, SITE_URL } from './app/core/site';
 import { buildSitemap } from './app/core/sitemap';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -30,6 +30,8 @@ const LEGACY_URLS = new Set([
   '/en-us/tag/savings',
   '/en-us/home',
 ]);
+
+const LOCALE_HOME = new RegExp(`^/${LOCALE}/?$`);
 
 const LEGACY_TOOL_PAGE = new RegExp(`^/${LOCALE}/(${Object.keys(LEGACY_TOOL_PAGES).join('|')})/?$`);
 
@@ -96,10 +98,17 @@ app.use((req, res, next) => {
     return;
   }
 
+  // The former locale home page: the home page lives at the site root only.
+  if (LOCALE_HOME.test(req.path)) {
+    const query = req.originalUrl.indexOf('?');
+    res.redirect(301, HOME_PATH + (query === -1 ? '' : req.originalUrl.slice(query)));
+    return;
+  }
+
   // The calculator, tax map and Ledger pages became tasks of the chat assistant.
   const tool = LEGACY_TOOL_PAGE.exec(req.path)?.[1];
   if (tool) {
-    res.redirect(301, `/${LOCALE}?topic=${LEGACY_TOOL_PAGES[tool]}`);
+    res.redirect(301, `${HOME_PATH}?topic=${LEGACY_TOOL_PAGES[tool]}`);
     return;
   }
 
@@ -242,4 +251,4 @@ if (isMainModule(import.meta.url) || process.env['pm_id']) {
 export const reqHandler = createNodeRequestHandler(app);
 
 /** Used by scripts/write-sitemap.mjs and scripts/vercel-output.mjs after the build. */
-export { buildSitemap, LEGACY_TOOL_PAGES, LOCALE };
+export { buildSitemap, HOME_PATH, LEGACY_TOOL_PAGES, LOCALE };

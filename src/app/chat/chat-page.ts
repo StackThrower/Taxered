@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide';
 import { SeoService } from '../core/seo.service';
-import { LOCALE, SITE_URL, localePath } from '../core/site';
+import { HOME_PATH, SITE_URL } from '../core/site';
 import { Icon } from '../shared/icon';
 import { ChatMessageView } from './chat-message';
 import { ChatService } from './chat.service';
@@ -309,7 +309,7 @@ export class ChatPage {
     if (suggestion) {
       this.text.setValue(suggestion.prompt);
     }
-    this.setSeo(inject(ActivatedRoute).snapshot.data['root'] === true);
+    this.setSeo();
   }
 
   protected useSuggestion(s: Suggestion): void {
@@ -385,14 +385,12 @@ export class ChatPage {
     await this.chat.attach(files);
   }
 
-  private setSeo(root: boolean): void {
+  private setSeo(): void {
     const year = new Date().getFullYear();
     const description =
       'AI-асистент для інвесторів: надішліть звіт Interactive Brokers, Freedom Finance чи історію Ledger Live і отримайте декларацію Ф1 (F0121215) з ПДФО та військовим збором, дохідність з урахуванням інфляції, карту податків, спреди й комісії — з графіками та файлами PDF, Excel, XML.';
     inject(SeoService).setPage({
-      title: root
-        ? `Податковий AI-асистент: декларація Ф1, дохідність, податки ${year}`
-        : `Taxered — податковий AI-асистент для інвесторів ${year}`,
+      title: `Податковий AI-асистент: декларація Ф1, дохідність, податки ${year}`,
       description,
       keywords: [
         'податковий асистент',
@@ -407,8 +405,8 @@ export class ChatPage {
         'карта податків',
         'Ledger Live',
       ],
-      path: root ? '/' : localePath(),
-      bareTitle: root,
+      path: HOME_PATH,
+      bareTitle: true,
       alternates: true,
       jsonLd: [
         {
@@ -416,7 +414,7 @@ export class ChatPage {
           '@type': 'WebApplication',
           name: 'Taxered — податковий AI-асистент',
           description,
-          url: `${SITE_URL}/${LOCALE}`,
+          url: SITE_URL,
           inLanguage: 'uk',
           applicationCategory: 'FinanceApplication',
           operatingSystem: 'Any',

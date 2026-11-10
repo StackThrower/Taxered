@@ -6,6 +6,8 @@ export const LOCALE = 'uk-ua';
 
 export const SITE_NAME = 'Taxered Tax Declaration';
 
+/** The home page (the chat assistant) lives at the site root; `/uk-ua` redirects here. */
+export const HOME_PATH = '/';
 
 /** Absolute app path for a page under the locale prefix, e.g. `localePath('help')` → `/uk-ua/help`. */
 export function localePath(...segments: string[]): string {

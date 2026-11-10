@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { UK } from '../core/i18n';
-import { localePath } from '../core/site';
+import { HOME_PATH, localePath } from '../core/site';
 
 @Component({
   selector: 'app-footer',
@@ -22,7 +22,7 @@ export class Footer {
   protected readonly helpTitle = UK.help.title;
   protected readonly knowledgeTitle = UK.knowledge.base;
   protected readonly paths = {
-    home: localePath(),
+    home: HOME_PATH,
     about: localePath('about'),
     privacy: localePath('privacy'),
     terms: localePath('terms'),

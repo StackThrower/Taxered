@@ -15,7 +15,6 @@ interface SitemapPage {
 export function buildSitemap(lastmod: string): string {
   const pages: SitemapPage[] = [
     { path: '', lastmod, changefreq: 'weekly', priority: 1.0 },
-    { path: localePath(), lastmod, changefreq: 'weekly', priority: 0.9 },
     { path: localePath('about'), lastmod, changefreq: 'monthly', priority: 0.6 },
     { path: localePath('help'), lastmod, changefreq: 'weekly', priority: 0.7 },
     { path: localePath('knowledge'), lastmod, changefreq: 'daily', priority: 0.8 },

@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
-import { SITE_URL, localePath } from './site';
+import { SITE_URL } from './site';
 
 export interface PageSeo {
   /** Page title; ` | Taxered` is appended to the document title unless `bareTitle` is set. */
@@ -69,7 +69,7 @@ export class SeoService {
     this.setName('twitter:description', page.description);
     this.setName('twitter:image', OG_IMAGE);
 
-    this.setLinks(url, page.alternates ?? false, page.path);
+    this.setLinks(url, page.alternates ?? false);
     this.setJsonLd(page.jsonLd ?? []);
   }
 
@@ -89,20 +89,16 @@ export class SeoService {
     }
   }
 
-  private setLinks(canonicalUrl: string, alternates: boolean, path: string): void {
+  private setLinks(canonicalUrl: string, alternates: boolean): void {
     const head = this.document.head;
     head.querySelectorAll('link[data-seo]').forEach((link) => link.remove());
 
     const links: Record<string, string>[] = [{ rel: 'canonical', href: canonicalUrl }];
     if (alternates) {
-      // Every page in a hreflang cluster must link back to the others, so x-default may only
-      // point at a URL that lists this page in return. Only the home pages (`/` ↔ `/uk-ua`)
-      // form such a pair; any other page is its own x-default.
-      const isHome = path === '/' || path === localePath();
-      const localizedUrl = isHome ? `${SITE_URL}${localePath()}` : canonicalUrl;
+      // The site has a single language, so every page is its own uk-UA and x-default alternate.
       links.push(
-        { rel: 'alternate', hreflang: 'x-default', href: isHome ? SITE_URL : localizedUrl },
-        { rel: 'alternate', hreflang: 'uk-UA', href: localizedUrl },
+        { rel: 'alternate', hreflang: 'x-default', href: canonicalUrl },
+        { rel: 'alternate', hreflang: 'uk-UA', href: canonicalUrl },
       );
     }
 

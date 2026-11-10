@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, viewChild } from '@angu
 import { RouterLink } from '@angular/router';
 import { BookOpen, FileText, HelpCircle, Menu, MessageSquare, X } from 'lucide';
 import { UK } from '../core/i18n';
-import { localePath } from '../core/site';
+import { HOME_PATH, localePath } from '../core/site';
 import { Icon } from '../shared/icon';
 import { ThemeToggle } from './theme-toggle';
 
@@ -14,7 +14,7 @@ import { ThemeToggle } from './theme-toggle';
 })
 export class Header {
   protected readonly s = UK.header;
-  protected readonly homePath = localePath();
+  protected readonly homePath = HOME_PATH;
   protected readonly knowledgePath = localePath('knowledge');
   protected readonly helpPath = localePath('help');
   protected readonly icons = { BookOpen, FileText, HelpCircle, Menu, MessageSquare, X };

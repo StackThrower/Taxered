@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, RESPONSE_INIT, inject } from '@angu
 import { RouterLink } from '@angular/router';
 import { UK } from '../../core/i18n';
 import { SeoService } from '../../core/seo.service';
-import { localePath } from '../../core/site';
+import { HOME_PATH } from '../../core/site';
 
 @Component({
   selector: 'app-not-found-page',
@@ -19,7 +19,7 @@ import { localePath } from '../../core/site';
 })
 export class NotFoundPage {
   protected readonly s = UK.notFound;
-  protected readonly homePath = localePath();
+  protected readonly homePath = HOME_PATH;
 
   constructor() {
     // Only provided during server rendering.
@@ -31,7 +31,7 @@ export class NotFoundPage {
     inject(SeoService).setPage({
       title: UK.notFound.title,
       description: UK.notFound.description,
-      path: localePath(),
+      path: HOME_PATH,
       noindex: true,
     });
   }
