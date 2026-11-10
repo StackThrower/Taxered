@@ -3,11 +3,12 @@
  *
  * Environment:
  * - ANTHROPIC_API_KEY — required; without it the chat answers that the agent is not configured.
- * - TAXERED_MODEL — model id, default `claude-opus-5-5`.
+ * - TAXERED_MODEL — model id, default `claude-haiku-5-5`.
  * - TAXERED_EFFORT — `low` | `medium` | `high` | `xhigh` | `max`, default `medium`
- *   (Opus 5.5 thinks adaptively; effort is its only depth control).
+ *   (the current models think adaptively; effort is the depth control).
  * - TAXERED_REFUSAL_FALLBACK=0 — turns off the server-side fallback that re-runs a request the
- *   safety classifiers declined on another model (on by default).
+ *   safety classifiers declined on another model (on by default where the model has one:
+ *   Haiku models have none, so the parameter is never sent for them).
  */
 import { ChatAnthropic } from '@langchain/anthropic';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
@@ -30,12 +31,17 @@ export function isAgentConfigured(env: NodeJS.ProcessEnv = process.env): boolean
   return !!env['ANTHROPIC_API_KEY'];
 }
 
+/** Haiku has no server-side refusal fallback: a declined request would stay declined. */
+function hasRefusalFallback(model: string): boolean {
+  return !model.startsWith('claude-haiku');
+}
+
 export function anthropicModels(env: NodeJS.ProcessEnv = process.env): ModelFactory {
-  const model = env['TAXERED_MODEL'] || 'claude-opus-5-5';
+  const model = env['TAXERED_MODEL'] || 'claude-haiku-5-5';
   const effortSetting = env['TAXERED_EFFORT'] as Effort | undefined;
   const effort: Effort =
     effortSetting && EFFORTS.includes(effortSetting) ? effortSetting : 'medium';
-  const fallback = env['TAXERED_REFUSAL_FALLBACK'] !== '0';
+  const fallback = env['TAXERED_REFUSAL_FALLBACK'] !== '0' && hasRefusalFallback(model);
 
   return (role) =>
     new ChatAnthropic({

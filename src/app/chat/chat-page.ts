@@ -157,7 +157,7 @@ const SUGGESTIONS: readonly Suggestion[] = [
 
       <form
         class="sticky bottom-0 z-20 rounded-xl border bg-card p-2 shadow-sm"
-        (ngSubmit)="submit()"
+        (submit)="onSubmit($event)"
         aria-label="Нове повідомлення"
       >
         @if (chat.attachments().length > 0) {
@@ -335,6 +335,15 @@ export class ChatPage {
       event.preventDefault();
       this.submit();
     }
+  }
+
+  /**
+   * The form has no forms directive (`ngSubmit` comes only with `NgForm`/`[formGroup]`), so the
+   * native submit must be cancelled here, or the button reloads the page and loses the chat.
+   */
+  protected onSubmit(event: Event): void {
+    event.preventDefault();
+    this.submit();
   }
 
   protected submit(): void {

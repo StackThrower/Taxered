@@ -55,5 +55,5 @@ variable "anthropic_api_key_secret" {
 variable "agent_model" {
   description = "Claude model of the chat agent"
   type        = string
-  default     = "claude-opus-5-5"
+  default     = "claude-haiku-5-5"
 }

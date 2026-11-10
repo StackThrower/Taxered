@@ -241,4 +241,23 @@ describe('chat UI', () => {
     expect(element.querySelector('.chat-markdown img')?.getAttribute('onerror')).toBeFalsy();
     expect(element.querySelector('[role="status"]')?.textContent).toContain('Відповідь готова');
   });
+
+  it('sends from the Send button without a native form submission', async () => {
+    const chat = TestBed.inject(ChatService);
+    const send = vi.spyOn(chat, 'send').mockResolvedValue();
+    const fixture = TestBed.createComponent(ChatPage);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const element = fixture.nativeElement as HTMLElement;
+    const textarea = element.querySelector('textarea')!;
+    textarea.value = 'Порахуй Ф1';
+    textarea.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    const event = new SubmitEvent('submit', { cancelable: true, bubbles: true });
+    element.querySelector('form')!.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(send).toHaveBeenCalledWith('Порахуй Ф1');
+  });
 });

@@ -8,4 +8,4 @@ region     = "us-central1"
 # Chat agent: create the secret first, e.g.
 #   printf '%s' "$ANTHROPIC_API_KEY" | gcloud secrets create anthropic-api-key --data-file=-
 # anthropic_api_key_secret = "anthropic-api-key"
-# agent_model              = "claude-opus-5-5"
+# agent_model              = "claude-haiku-5-5"
