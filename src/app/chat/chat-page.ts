@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   ElementRef,
+  afterNextRender,
   afterRenderEffect,
   computed,
   inject,
@@ -9,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import {
   ArrowRightLeft,
@@ -17,6 +18,8 @@ import {
   FileText,
   LineChart,
   LoaderCircle,
+  LogIn,
+  LogOut,
   Map as MapIcon,
   Paperclip,
   RotateCcw,
@@ -107,11 +110,19 @@ const SUGGESTIONS: readonly Suggestion[] = [
             податків або файли з розрахунками.
           </p>
         </div>
-        @if (chat.messages().length > 0) {
-          <button type="button" class="btn btn-outline btn-sm shrink-0" (click)="reset()">
-            <svg [appIcon]="icons.RotateCcw" class="size-4"></svg>
-            Нова розмова
-          </button>
+        @if (chat.auth() === 'signed-in') {
+          <div class="flex shrink-0 flex-wrap justify-end gap-2">
+            @if (chat.messages().length > 0) {
+              <button type="button" class="btn btn-outline btn-sm" (click)="reset()">
+                <svg [appIcon]="icons.RotateCcw" class="size-4"></svg>
+                Нова розмова
+              </button>
+            }
+            <button type="button" class="btn btn-ghost btn-sm" (click)="logout()">
+              <svg [appIcon]="icons.LogOut" class="size-4"></svg>
+              Вийти
+            </button>
+          </div>
         }
       </div>
 
@@ -155,98 +166,158 @@ const SUGGESTIONS: readonly Suggestion[] = [
         </div>
       }
 
-      <form
-        class="sticky bottom-0 z-20 rounded-xl border bg-card p-2 shadow-sm"
-        (submit)="onSubmit($event)"
-        aria-label="Нове повідомлення"
-      >
-        @if (chat.attachments().length > 0) {
-          <ul class="flex flex-wrap gap-2 p-1" aria-label="Файли до відправлення">
-            @for (a of chat.attachments(); track a.key) {
-              <li
-                class="inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
-                [class.border-destructive]="a.state === 'failed'"
-              >
-                <svg
-                  [appIcon]="a.state === 'uploading' ? icons.LoaderCircle : icons.FileText"
-                  class="size-3.5"
-                  [class.animate-spin]="a.state === 'uploading'"
-                ></svg>
-                <span class="truncate">{{ a.name }}</span>
-                @if (a.state === 'failed') {
-                  <span class="text-destructive">— {{ a.error }}</span>
-                }
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-icon size-5 cursor-pointer"
-                  [attr.aria-label]="'Прибрати ' + a.name"
-                  (click)="chat.removeAttachment(a.key)"
-                >
-                  <svg [appIcon]="icons.X" class="size-3"></svg>
-                </button>
-              </li>
-            }
-          </ul>
-        }
-        <div class="flex items-end gap-2">
+      @if (chat.auth() === 'signed-out') {
+        <form
+          class="sticky bottom-0 z-20 space-y-3 rounded-xl border bg-card p-4 shadow-sm"
+          aria-labelledby="chat-login-title"
+          [formGroup]="loginForm"
+          (ngSubmit)="login()"
+        >
+          <h2 id="chat-login-title" class="font-semibold">Вхід до асистента</h2>
+          <p class="text-sm text-muted-foreground">
+            Чат доступний лише після входу. Введіть логін і пароль.
+          </p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <div class="space-y-1">
+              <label for="chat-login-username" class="text-sm font-medium">Логін</label>
+              <input
+                #username
+                id="chat-login-username"
+                class="input w-full"
+                type="text"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
+                required
+                formControlName="username"
+                [attr.aria-invalid]="loginError() ? true : null"
+                [attr.aria-describedby]="loginError() ? 'chat-login-error' : null"
+              />
+            </div>
+            <div class="space-y-1">
+              <label for="chat-login-password" class="text-sm font-medium">Пароль</label>
+              <input
+                id="chat-login-password"
+                class="input w-full"
+                type="password"
+                autocomplete="current-password"
+                required
+                formControlName="password"
+                [attr.aria-invalid]="loginError() ? true : null"
+                [attr.aria-describedby]="loginError() ? 'chat-login-error' : null"
+              />
+            </div>
+          </div>
+          @if (loginError(); as error) {
+            <p id="chat-login-error" class="text-sm text-destructive" role="alert">{{ error }}</p>
+          }
           <button
-            type="button"
-            class="btn btn-ghost btn-icon shrink-0"
-            aria-label="Прикріпити файли (XML або CSV)"
-            title="Прикріпити файли"
-            (click)="fileInput.click()"
+            type="submit"
+            class="btn btn-primary"
+            [disabled]="loggingIn() || loginForm.invalid"
           >
-            <svg [appIcon]="icons.Paperclip" class="size-5"></svg>
+            <svg
+              [appIcon]="loggingIn() ? icons.LoaderCircle : icons.LogIn"
+              class="size-4"
+              [class.animate-spin]="loggingIn()"
+            ></svg>
+            Увійти
           </button>
-          <input
-            #fileInput
-            type="file"
-            class="sr-only"
-            tabindex="-1"
-            aria-hidden="true"
-            multiple
-            accept=".xml,.csv,text/xml,text/csv,application/xml"
-            (change)="onFiles($event)"
-          />
-          <label for="chat-input" class="sr-only">Повідомлення асистенту</label>
-          <textarea
-            id="chat-input"
-            #input
-            class="max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground"
-            rows="1"
-            [attr.maxlength]="maxChars"
-            placeholder="Запитайте про податки або прикріпіть звіт…"
-            aria-describedby="chat-input-hint"
-            [formControl]="text"
-            (keydown.enter)="onEnter($event)"
-          ></textarea>
-          @if (chat.busy()) {
+        </form>
+      } @else if (chat.auth() === 'signed-in') {
+        <form
+          class="sticky bottom-0 z-20 rounded-xl border bg-card p-2 shadow-sm"
+          (submit)="onSubmit($event)"
+          aria-label="Нове повідомлення"
+        >
+          @if (chat.attachments().length > 0) {
+            <ul class="flex flex-wrap gap-2 p-1" aria-label="Файли до відправлення">
+              @for (a of chat.attachments(); track a.key) {
+                <li
+                  class="inline-flex max-w-full items-center gap-1.5 rounded-md border px-2 py-1 text-xs"
+                  [class.border-destructive]="a.state === 'failed'"
+                >
+                  <svg
+                    [appIcon]="a.state === 'uploading' ? icons.LoaderCircle : icons.FileText"
+                    class="size-3.5"
+                    [class.animate-spin]="a.state === 'uploading'"
+                  ></svg>
+                  <span class="truncate">{{ a.name }}</span>
+                  @if (a.state === 'failed') {
+                    <span class="text-destructive">— {{ a.error }}</span>
+                  }
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-icon size-5 cursor-pointer"
+                    [attr.aria-label]="'Прибрати ' + a.name"
+                    (click)="chat.removeAttachment(a.key)"
+                  >
+                    <svg [appIcon]="icons.X" class="size-3"></svg>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+          <div class="flex items-end gap-2">
             <button
               type="button"
-              class="btn btn-outline btn-icon shrink-0"
-              aria-label="Зупинити відповідь"
-              (click)="chat.stop()"
+              class="btn btn-ghost btn-icon shrink-0"
+              aria-label="Прикріпити файли (XML або CSV)"
+              title="Прикріпити файли"
+              (click)="fileInput.click()"
             >
-              <svg [appIcon]="icons.Square" class="size-4"></svg>
+              <svg [appIcon]="icons.Paperclip" class="size-5"></svg>
             </button>
-          } @else {
-            <button
-              type="submit"
-              class="btn btn-primary btn-icon shrink-0"
-              aria-label="Надіслати"
-              [disabled]="!canSend()"
-            >
-              <svg [appIcon]="icons.Send" class="size-4"></svg>
-            </button>
-          }
-        </div>
-        <p id="chat-input-hint" class="px-2 pt-1 text-xs text-muted-foreground">
-          Enter — надіслати, Shift+Enter — новий рядок. Файли обробляються на сервері Taxered і
-          зберігаються тимчасово — до 2 годин неактивності; моделі Claude (Anthropic) передаються
-          ваші повідомлення та підсумки розрахунків. Це довідковий розрахунок, не податкова
-          консультація.
-        </p>
-      </form>
+            <input
+              #fileInput
+              type="file"
+              class="sr-only"
+              tabindex="-1"
+              aria-hidden="true"
+              multiple
+              accept=".xml,.csv,text/xml,text/csv,application/xml"
+              (change)="onFiles($event)"
+            />
+            <label for="chat-input" class="sr-only">Повідомлення асистенту</label>
+            <textarea
+              id="chat-input"
+              #input
+              class="max-h-48 min-h-10 flex-1 resize-none bg-transparent px-2 py-2 text-base outline-none placeholder:text-muted-foreground"
+              rows="1"
+              [attr.maxlength]="maxChars"
+              placeholder="Запитайте про податки або прикріпіть звіт…"
+              aria-describedby="chat-input-hint"
+              [formControl]="text"
+              (keydown.enter)="onEnter($event)"
+            ></textarea>
+            @if (chat.busy()) {
+              <button
+                type="button"
+                class="btn btn-outline btn-icon shrink-0"
+                aria-label="Зупинити відповідь"
+                (click)="chat.stop()"
+              >
+                <svg [appIcon]="icons.Square" class="size-4"></svg>
+              </button>
+            } @else {
+              <button
+                type="submit"
+                class="btn btn-primary btn-icon shrink-0"
+                aria-label="Надіслати"
+                [disabled]="!canSend()"
+              >
+                <svg [appIcon]="icons.Send" class="size-4"></svg>
+              </button>
+            }
+          </div>
+          <p id="chat-input-hint" class="px-2 pt-1 text-xs text-muted-foreground">
+            Enter — надіслати, Shift+Enter — новий рядок. Файли обробляються на сервері Taxered і
+            зберігаються тимчасово — до 2 годин неактивності; моделі Claude (Anthropic) передаються
+            ваші повідомлення та підсумки розрахунків. Це довідковий розрахунок, не податкова
+            консультація.
+          </p>
+        </form>
+      }
     </section>
   `,
 })
@@ -256,6 +327,8 @@ export class ChatPage {
   protected readonly icons = {
     FileText,
     LoaderCircle,
+    LogIn,
+    LogOut,
     Paperclip,
     RotateCcw,
     Send,
@@ -267,8 +340,17 @@ export class ChatPage {
   protected readonly text = new FormControl('', { nonNullable: true });
   protected readonly dragging = signal(false);
 
-  private readonly fileInput = viewChild.required<ElementRef<HTMLInputElement>>('fileInput');
-  private readonly input = viewChild.required<ElementRef<HTMLTextAreaElement>>('input');
+  protected readonly loginForm = new FormGroup({
+    username: new FormControl('', { nonNullable: true, validators: Validators.required }),
+    password: new FormControl('', { nonNullable: true, validators: Validators.required }),
+  });
+  protected readonly loginError = signal<string | null>(null);
+  protected readonly loggingIn = signal(false);
+
+  // The composer exists only after login.
+  private readonly fileInput = viewChild<ElementRef<HTMLInputElement>>('fileInput');
+  private readonly input = viewChild<ElementRef<HTMLTextAreaElement>>('input');
+  private readonly username = viewChild<ElementRef<HTMLInputElement>>('username');
   private readonly end = viewChild.required<ElementRef<HTMLElement>>('end');
 
   /** Announced to screen readers: the agent's progress, not every streamed word. */
@@ -304,6 +386,13 @@ export class ChatPage {
       }
     });
 
+    // The page is prerendered; only the browser can ask whether it is logged in.
+    afterNextRender(() => {
+      if (this.chat.auth() === 'unknown') {
+        void this.chat.checkSession();
+      }
+    });
+
     const topic = inject(ActivatedRoute).snapshot.queryParamMap.get('topic');
     const suggestion = SUGGESTIONS.find((s) => s.id === topic);
     if (suggestion) {
@@ -314,18 +403,45 @@ export class ChatPage {
 
   protected useSuggestion(s: Suggestion): void {
     this.text.setValue(s.prompt);
-    if (s.needsFile) {
-      this.fileInput().nativeElement.click();
+    if (this.chat.auth() !== 'signed-in') {
+      this.username()?.nativeElement.focus();
+    } else if (s.needsFile) {
+      this.fileInput()?.nativeElement.click();
     } else {
-      this.input().nativeElement.focus();
+      this.input()?.nativeElement.focus();
     }
+  }
+
+  protected async login(): Promise<void> {
+    if (this.loginForm.invalid || this.loggingIn()) {
+      return;
+    }
+    this.loggingIn.set(true);
+    this.loginError.set(null);
+    const { username, password } = this.loginForm.getRawValue();
+    const error = await this.chat.login(username, password);
+    this.loggingIn.set(false);
+    if (error) {
+      this.loginError.set(error);
+      this.loginForm.controls.password.setValue('');
+      return;
+    }
+    this.loginForm.reset();
+    // The composer renders after this change; move focus there instead of losing it.
+    setTimeout(() => this.input()?.nativeElement.focus());
+  }
+
+  protected async logout(): Promise<void> {
+    this.text.setValue('');
+    await this.chat.logout();
+    setTimeout(() => this.username()?.nativeElement.focus());
   }
 
   protected async onFiles(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const files = Array.from(input.files ?? []);
     input.value = '';
-    this.input().nativeElement.focus();
+    this.input()?.nativeElement.focus();
     await this.chat.attach(files);
   }
 
@@ -358,11 +474,11 @@ export class ChatPage {
   protected reset(): void {
     this.chat.reset();
     this.text.setValue('');
-    this.input().nativeElement.focus();
+    this.input()?.nativeElement.focus();
   }
 
   protected onDragOver(event: DragEvent): void {
-    if (event.dataTransfer?.types.includes('Files')) {
+    if (this.chat.auth() === 'signed-in' && event.dataTransfer?.types.includes('Files')) {
       event.preventDefault();
       this.dragging.set(true);
     }
@@ -377,7 +493,7 @@ export class ChatPage {
 
   protected async onDrop(event: DragEvent): Promise<void> {
     const files = Array.from(event.dataTransfer?.files ?? []);
-    if (files.length === 0) {
+    if (files.length === 0 || this.chat.auth() !== 'signed-in') {
       return;
     }
     event.preventDefault();

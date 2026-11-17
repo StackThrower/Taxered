@@ -7,6 +7,7 @@ import {
 import express from 'express';
 import { basename, join } from 'node:path';
 import { buildTaxeredAgent } from './agent/graph';
+import { credentialsFromEnv } from './agent/auth';
 import { DEFAULT_MAX_RUN_MS, chatRouter } from './agent/http';
 import { anthropicModels, isAgentConfigured } from './agent/model';
 import { RedisThreadStore, redisFromEnv } from './agent/store/redis-store';
@@ -162,6 +163,8 @@ app.use(
     unavailable: chatUnavailable ?? undefined,
     store: redis ? new RedisThreadStore(redis) : new MemoryThreadStore(),
     maxRunMs: Number(process.env['TAXERED_MAX_RUN_SECONDS']) * 1000 || DEFAULT_MAX_RUN_MS,
+    // CHAT_USERNAME / CHAT_PASSWORD; without them the chat stays locked.
+    credentials: credentialsFromEnv(),
   }),
 );
 

@@ -7,6 +7,8 @@
  * GET    /api/chat/threads/:threadId/outputs/:outputId     a generated file
  * DELETE /api/chat/threads/:threadId                       forget the thread and its files
  *
+ * plus the login routes of `./auth` (/api/chat/session); the routes above require a login.
+ *
  * Nothing is kept in the process between requests: each one loads the thread from the store.
  */
 import {
@@ -25,6 +27,7 @@ import {
   type ChatArtifact,
   type ChatStreamEvent,
 } from '../app/chat/protocol';
+import { chatAuth, clientAddress, type ChatCredentials } from './auth';
 import { ARTIFACT_EVENT, errorText } from './context';
 import { messageText, type TaxeredAgent } from './graph';
 import { roleTag } from './model';
@@ -66,6 +69,11 @@ export interface ChatRouterOptions {
   store: ThreadStore;
   /** An answer taking longer is stopped, so it can end cleanly before the platform kills it. */
   maxRunMs?: number;
+  /**
+   * The login for the chat; null keeps it locked (credentials not configured). Left out, the
+   * API is open: only for tests.
+   */
+  credentials?: ChatCredentials | null;
 }
 
 export function chatRouter({
@@ -73,6 +81,7 @@ export function chatRouter({
   unavailable = 'Агент не налаштований: на сервері не задано ANTHROPIC_API_KEY.',
   store,
   maxRunMs = DEFAULT_MAX_RUN_MS,
+  credentials,
 }: ChatRouterOptions): Router {
   const router = express.Router();
 
@@ -81,6 +90,10 @@ export function chatRouter({
     res.setHeader('X-Robots-Tag', 'noindex');
     next();
   });
+
+  if (credentials !== undefined) {
+    router.use(chatAuth(router, credentials, store));
+  }
 
   router.param('threadId', (_req, res, next, id: string) => {
     if (!isThreadId(id)) {
@@ -302,11 +315,6 @@ export function toChatEvent(event: StreamEvent): ChatStreamEvent | null {
     default:
       return null;
   }
-}
-
-/** Vercel sets X-Real-IP to the client address (and overwrites any sent by the client). */
-function clientAddress(req: Request): string {
-  return req.header('X-Real-IP') || req.ip || 'unknown';
 }
 
 function userMessage(error: unknown): string {

@@ -245,6 +245,7 @@ describe('chat UI', () => {
   it('sends from the Send button without a native form submission', async () => {
     const chat = TestBed.inject(ChatService);
     const send = vi.spyOn(chat, 'send').mockResolvedValue();
+    chat.auth.set('signed-in');
     const fixture = TestBed.createComponent(ChatPage);
     fixture.detectChanges();
     await fixture.whenStable();

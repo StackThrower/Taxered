@@ -190,3 +190,71 @@ describe('chat API with the LangGraph agent', () => {
     expect(decodeText(new TextEncoder().encode('﻿a,b'))).toBe('a,b');
   });
 });
+
+describe('chat API login', () => {
+  const servers: Server[] = [];
+  const credentials = { username: 'admin', password: 'correct horse' };
+
+  afterEach(() => {
+    servers.splice(0).forEach((s) => s.close());
+  });
+
+  async function start(creds: typeof credentials | null = credentials): Promise<string> {
+    const app = express();
+    app.use(
+      '/api/chat',
+      chatRouter({ agent: null, store: new MemoryThreadStore(), credentials: creds }),
+    );
+    const running = await serve(app);
+    servers.push(running.server);
+    return running.base;
+  }
+
+  const login = (base: string, body: unknown) =>
+    fetch(`${base}/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+  it('refuses the chat without a login and accepts it after one', async () => {
+    const base = await start();
+    const files = `${base}/threads/${randomUUID()}/files`;
+    const upload = (headers: Record<string, string> = {}) =>
+      fetch(files, { method: 'POST', headers: { 'X-File-Name': 'a.csv', ...headers }, body: 'a' });
+
+    expect((await upload()).status).toBe(401);
+    expect(await (await fetch(`${base}/session`)).json()).toEqual({ authenticated: false });
+
+    expect((await login(base, { username: 'admin', password: 'wrong' })).status).toBe(401);
+    const ok = await login(base, credentials);
+    expect(ok.status).toBe(200);
+    const cookie = ok.headers.get('Set-Cookie')!;
+    expect(cookie).toMatch(/HttpOnly/);
+    expect(cookie).toMatch(/SameSite=Strict/);
+    const session = cookie.split(';')[0];
+
+    expect(await (await fetch(`${base}/session`, { headers: { Cookie: session } })).json()).toEqual(
+      { authenticated: true },
+    );
+    expect((await upload({ Cookie: session })).status).toBe(201);
+    // A forged signature is refused.
+    expect(
+      (await upload({ Cookie: session.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A')) })).status,
+    ).toBe(401);
+  });
+
+  it('limits login attempts per address', async () => {
+    const base = await start();
+    for (let i = 0; i < 10; i++) {
+      await login(base, { username: 'admin', password: `guess ${i}` });
+    }
+    expect((await login(base, credentials)).status).toBe(429);
+  });
+
+  it('stays locked when no credentials are configured', async () => {
+    const base = await start(null);
+    expect((await login(base, { username: '', password: '' })).status).toBe(503);
+    expect((await fetch(`${base}/threads/${randomUUID()}`, { method: 'DELETE' })).status).toBe(503);
+  });
+});

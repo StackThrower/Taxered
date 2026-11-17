@@ -43,6 +43,12 @@
 | `POST`   | `/api/chat/threads/:threadId/messages`          | `{ text, fileIds }` → `text/event-stream` |
 | `GET`    | `/api/chat/threads/:threadId/outputs/:outputId` | згенерований файл                         |
 | `DELETE` | `/api/chat/threads/:threadId`                   | забути розмову та файли                   |
+| `GET`    | `/api/chat/session`                             | `{ authenticated }`                       |
+| `POST`   | `/api/chat/session`                             | `{ username, password }` → cookie сесії   |
+| `DELETE` | `/api/chat/session`                             | вийти                                     |
+
+Усі маршрути `/threads/*` вимагають входу: HttpOnly-cookie з підписом HMAC на 30 днів; зміна
+пароля завершує всі сесії. Спроби входу обмежені (10 за 15 хвилин з однієї адреси).
 
 Події стріму (`src/app/chat/protocol.ts`): `status` (який субагент працює), `token` (текст
 відповіді), `artifact` (форма, графік, карта, файл), `error`, `done`.
@@ -52,6 +58,8 @@
 | Змінна                     | За замовчуванням   | Опис                                                            |
 | -------------------------- | ------------------ | --------------------------------------------------------------- |
 | `ANTHROPIC_API_KEY`        | —                  | обов'язкова; без неї чат відповідає, що агент не налаштований   |
+| `CHAT_USERNAME`            | —                  | обов'язкова; логін для входу в чат                              |
+| `CHAT_PASSWORD`            | —                  | обов'язкова; пароль (без логіна й пароля чат заблоковано)       |
 | `TAXERED_MODEL`            | `claude-haiku-5-5` | модель Claude                                                   |
 | `TAXERED_EFFORT`           | `medium`           | `low` … `max` — глибина міркувань моделі                        |
 | `TAXERED_REFUSAL_FALLBACK` | увімкнено          | `0` вимикає серверний fallback при відмові (у Haiku його немає) |
@@ -78,7 +86,7 @@ LangChain, Claude, jsPDF, SheetJS, marked, Lucide.
 
 ```bash
 npm install
-ANTHROPIC_API_KEY=… npm start  # dev-сервер з чатом: http://localhost:4200
+ANTHROPIC_API_KEY=… CHAT_USERNAME=… CHAT_PASSWORD=… npm start  # dev-сервер з чатом: http://localhost:4200
 npm run build             # production-збірка в dist/Taxered (з пререндером)
 npm run serve:ssr:Taxered # запуск зібраного SSR-сервера (PORT, за замовчуванням 4000)
 npm test                  # unit-тести (Vitest) + перевірка XML за XSD ДПС (потрібен xmllint);
@@ -131,7 +139,8 @@ schemas/dps/       # офіційні XSD і бланки ДПС
 1. **Storage → Marketplace → Upstash for Redis** — створити базу й під'єднати до проєкту
    (додає `KV_REST_API_URL` і `KV_REST_API_TOKEN`; підходять і `UPSTASH_REDIS_REST_URL` /
    `UPSTASH_REDIS_REST_TOKEN`).
-2. **Settings → Environment Variables** — `ANTHROPIC_API_KEY` (тип Sensitive); за потреби
+2. **Settings → Environment Variables** — `ANTHROPIC_API_KEY`, `CHAT_USERNAME`, `CHAT_PASSWORD`
+   (тип Sensitive); за потреби
    `TAXERED_MODEL`, `TAXERED_EFFORT`.
 3. **Settings → Functions** — Fluid compute увімкнено (потрібно для 300 с на відповідь).
 4. Передеплоїти. Без Redis або ключа чат відповідає, чого саме бракує.

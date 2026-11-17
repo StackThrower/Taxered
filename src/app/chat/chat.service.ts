@@ -32,6 +32,9 @@ export interface Attachment {
   error: string | null;
 }
 
+/** Whether this browser is logged in to the chat; unknown until the server answers. */
+export type AuthState = 'unknown' | 'signed-out' | 'signed-in';
+
 function newThreadId(): string {
   return crypto.randomUUID();
 }
@@ -65,12 +68,58 @@ export class ChatService {
   private nextId = 1;
   private abort: AbortController | null = null;
 
+  readonly auth = signal<AuthState>('unknown');
   readonly messages = signal<ChatMessage[]>([]);
   readonly attachments = signal<Attachment[]>([]);
   readonly busy = computed(() => this.messages().some((m) => m.pending));
   readonly uploading = computed(() => this.attachments().some((a) => a.state === 'uploading'));
   /** The Ф1 artifact whose editable form is open; one at a time (the form has fixed ids). */
   readonly editingF1 = signal<string | null>(null);
+
+  /** Asks the server whether the session cookie (HttpOnly, so unreadable here) is valid. */
+  async checkSession(): Promise<void> {
+    try {
+      const response = await fetch(`${CHAT_API}/session`, { headers: BYPASS_WORKER });
+      const body = (await response.json()) as { authenticated?: boolean };
+      this.auth.set(body.authenticated ? 'signed-in' : 'signed-out');
+    } catch {
+      this.auth.set('signed-out');
+    }
+  }
+
+  /** Logs in; returns the reason on failure, or null. */
+  async login(username: string, password: string): Promise<string | null> {
+    try {
+      const response = await fetch(`${CHAT_API}/session`, {
+        method: 'POST',
+        headers: { ...BYPASS_WORKER, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        return body?.error ?? `HTTP ${response.status}`;
+      }
+      this.auth.set('signed-in');
+      return null;
+    } catch {
+      return 'Не вдалося з’єднатися з сервером.';
+    }
+  }
+
+  async logout(): Promise<void> {
+    this.reset();
+    this.auth.set('signed-out');
+    await fetch(`${CHAT_API}/session`, { method: 'DELETE', headers: BYPASS_WORKER }).catch(
+      () => undefined,
+    );
+  }
+
+  /** A 401 means the session expired or the password changed: show the login form again. */
+  private checkUnauthorized(response: Response): void {
+    if (response.status === 401) {
+      this.auth.set('signed-out');
+    }
+  }
 
   async attach(files: readonly File[]): Promise<void> {
     await Promise.all(files.map((file) => this.upload(file)));
@@ -107,6 +156,7 @@ export class ChatService {
         },
         body: data,
       });
+      this.checkUnauthorized(response);
       const body = (await response.json()) as UploadedFile | { error: string };
       if (!response.ok || 'error' in body) {
         add({ state: 'failed', error: 'error' in body ? body.error : `HTTP ${response.status}` });
@@ -165,6 +215,7 @@ export class ChatService {
         signal: this.abort.signal,
       });
       if (!response.ok || !response.body) {
+        this.checkUnauthorized(response);
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new Error(body?.error ?? `HTTP ${response.status}`);
       }
